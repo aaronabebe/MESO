@@ -1,3 +1,10 @@
+# repo specific stuff
+
+.idea/
+tb_logs/
+data/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
