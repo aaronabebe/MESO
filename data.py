@@ -25,14 +25,18 @@ def _get_cifar10(train: bool, **kwargs) -> torch.utils.data.DataLoader:
         root=DEFAULT_DATA_DIR,
         train=train,
         download=True,
-        transform=_default_cifar10_transforms()
+        transform=_default_cifar10_transforms() if train else _default_transforms((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     )
     trainloader = torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=os.cpu_count(), **kwargs)
     return trainloader
 
 
 def _default_cifar10_transforms():
+    return _default_transforms(CIFAR10_MEAN, CIFAR10_STD)
+
+
+def _default_transforms(mean, std):
     return transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize(mean=CIFAR10_MEAN, std=CIFAR10_STD)
+        transforms.Normalize(mean=mean, std=std)
     ])

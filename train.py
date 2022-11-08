@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from data import get_dataloader
 from models import get_model
 from utils import get_experiment_name
-from visualize import loss_landscape
+from visualize import dino_attention
 
 
 def get_args() -> argparse.Namespace:
@@ -65,11 +65,16 @@ def main(args: argparse.Namespace):
         model = get_model(args.model)
         ckpt = torch.load('./tb_logs/vit_tiny_cifar10_30_128/version_1/checkpoints/epoch=5-step=2346.ckpt')
         model.load_state_dict({k[len('model.'):]: v for k, v in ckpt['state_dict'].items() if k.startswith('model.')})
+        for p in model.parameters():
+            p.requires_grad = False
         model.eval()
 
-        dl = get_dataloader(args.dataset, train=True, batch_size=args.batch_size)
+        dl = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
-        loss_landscape(model, data)
+        # data = torch.rand(1, 1, 3, 32, 32)
+        # loss_landscape(model, data)
+        # grad_cam(model, args.model, data)
+        dino_attention(model, args.model, data)
         return
 
     experiment_name = get_experiment_name(args)

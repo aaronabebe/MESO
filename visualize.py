@@ -5,9 +5,79 @@ import loss_landscapes as ll
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam.utils.image import show_cam_on_image
+from torch.nn import functional as F
+
+from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
 CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+
+
+def grad_cam(model, model_name, data):
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(5, 8))
+    if 'vit' in model_name:
+        target_layer = [model.blocks[-1].norm1]
+
+    # use only one image for now
+    input_tensor = data[0][0:1]
+    cam = GradCAM(
+        model=model,
+        target_layers=target_layer,
+        use_cuda=torch.cuda.is_available(),
+        reshape_transform=grad_cam_reshape_transform,
+    )
+    grayscale_cam = cam(input_tensor=input_tensor, targets=None)
+    input_tensor = np.transpose(input_tensor.numpy()[0], (1, 2, 0))
+    ax1.imshow(input_tensor)
+    visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :])
+    ax2.imshow(visualization)
+    plt.show()
+
+
+def dino_attention(model, model_name, data):
+    """
+    Visualize the self attention of a transformer model, similar to the DINO paper.
+    https://github.com/facebookresearch/dino
+    https://github.com/rwightman/pytorch-image-models/discussions/1232
+    :param model:
+    :param data:
+    :return:
+    """
+    if 'vit' not in model_name:
+        raise NotImplementedError('Attention visualization only works for ViT models.')
+
+    model.blocks[-1].attn.forward = attention_viz_forward_wrapper(model.blocks[-1].attn)
+
+    # use only one image for now
+    img = data[0][0:1]
+    y = model(img)
+    print('\n'.join([f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]))
+
+    attn_map = model.blocks[-1].attn.attn_map.mean(dim=1).squeeze(0).detach()
+    cls_weight = model.blocks[-1].attn.cls_attn_map.mean(dim=1).view(4, 4).detach()
+
+    img_resized = img[0].permute(1, 2, 0) * 0.5 + 0.5
+    cls_resized = F.interpolate(cls_weight.view(1, 1, 4, 4), (32, 32), mode='bilinear').view(32, 32, 1)
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(5, 10))
+    plt.tight_layout()
+
+    ax1.imshow(img_resized)
+    ax1.set_title(f'Input image class: {CIFAR10_LABELS[data[1][0]]}')
+
+    ax2.imshow(attn_map)
+    ax2.set_title('Last Block Attention Map')
+    ax2.set_xlabel('Head')
+    ax2.set_ylabel('Patch')
+
+    ax3.imshow(cls_resized)
+    ax3.set_title('Class Attention Map')
+    ax3.set_xlabel('Patch')
+    ax3.set_ylabel('Patch')
+
+    plt.show()
 
 
 def loss_landscape(model, data, steps=50):

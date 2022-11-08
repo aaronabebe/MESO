@@ -1,7 +1,7 @@
-import timm
-import torch
 from typing import Any
 
+import timm
+import torch
 from timm.models import register_model
 from timm.models.vision_transformer import VisionTransformer
 
