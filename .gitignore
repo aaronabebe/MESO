@@ -3,6 +3,7 @@
 .idea/
 tb_logs/
 data/
+plots/
 
 
 # Byte-compiled / optimized / DLL files
