@@ -1,6 +1,52 @@
+import torch
+import os
+import glob
+
+TENSORBOARD_LOG_DIR = './tb_logs'
+
+
 def get_experiment_name(args):
     name = f'{args.model}_{args.epochs}_{args.batch_size}'
     return name
+
+
+def accuracy(y, y_hat, top_k=1):
+    return torch.eq(y_hat.argmax(-top_k), y).float().mean()
+
+
+def remove_prefix(state_dict, prefix):
+    return {k[len(prefix):]: v for k, v in state_dict.items() if k.startswith(prefix)}
+
+
+def _get_latest_model_path(name):
+    model_version_path = f'{TENSORBOARD_LOG_DIR}/{name}'
+    latest_version = sorted(
+        os.listdir(model_version_path),
+        reverse=True,
+        key=lambda x: int(x.split('_')[1])
+    )[0]
+    ckpt_path = glob.glob(f'{model_version_path}/{latest_version}/checkpoints/*.ckpt')[0]
+    return ckpt_path
+
+
+def eval_accuracy(output, target, topk=(1, 5)):
+    with torch.no_grad():
+        maxk = max(topk)
+        batch_size = target.size(0)
+
+        _, pred = output.topk(maxk, dim=1)  # top-k index: size (B, k)
+        pred = pred.t()  # size (k, B)
+        correct = pred.eq(target.view(1, -1).expand_as(pred))
+
+        acc = []
+        for k in topk:
+            correct_k = correct[:k].float().sum()
+            acc.append(correct_k * 100.0 / batch_size)
+
+        if len(acc) == 1:
+            return acc[0]
+        else:
+            return acc
 
 
 def grad_cam_reshape_transform(tensor, height=4, width=4):

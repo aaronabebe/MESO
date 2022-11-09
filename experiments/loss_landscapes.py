@@ -60,15 +60,11 @@ def calc_landscape_grid(model, data, extension=1, grid_length=50):
         for j in range(grid_length):
             Z.append(calc_loss_at_pos(model, data, calc_new_pos(origin, vector_x, vector_y, X[i][j], Y[i][j])))
 
-    # [[Z.append(calc_loss_at_pos(model, data, calc_new_pos(origin, vector_x, vector_y, X[i][j], Y[i][j])))
-    #   for j in range(grid_length)
-    #   ] for i in range(grid_length)]
-
     Z = np.array(Z)
     return X, Y, Z
 
 
-def loss_landscape_1d(model, data, vmin=0.1, vmax=10, vlevel=0.5, save=False):
+def loss_landscape_2d(model, data, vmin=0.1, vmax=10, vlevel=0.5, save=False):
     """
     Code adapted from https://github.com/artur-deluca/landscapeviz
     Plots the loss landscape in 1d.
