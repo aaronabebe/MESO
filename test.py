@@ -8,13 +8,7 @@ from tqdm import tqdm
 
 from data import get_dataloader
 from models import get_eval_model
-from utils import eval_accuracy
-
-CORRUPTIONS = (
-    'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
-    'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
-    'spatter', 'speckle_noise', 'zoom_blur'
-)
+from utils import eval_accuracy, CIFAR_10_CORRUPTIONS
 
 
 def parse_args():
@@ -35,7 +29,7 @@ def main(args: argparse.Namespace):
     if args.corruption:
         corruption = [args.corruption]
     else:
-        corruption = CORRUPTIONS
+        corruption = CIFAR_10_CORRUPTIONS
 
     result = {k: {} for k in corruption}
     for cname in corruption:

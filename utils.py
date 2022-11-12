@@ -3,6 +3,17 @@ import os
 import glob
 
 TENSORBOARD_LOG_DIR = './tb_logs'
+DEFAULT_DATA_DIR = './data'
+
+# from https://stackoverflow.com/questions/66678052/how-to-calculate-the-mean-and-the-std-of-cifar10-data
+CIFAR10_MEAN = (0.49139968, 0.48215841, 0.44653091)
+CIFAR10_STD = (0.24703223, 0.24348513, 0.26158784)
+
+CIFAR_10_CORRUPTIONS = (
+    'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
+    'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
+    'spatter', 'speckle_noise', 'zoom_blur'
+)
 
 
 def get_experiment_name(args):

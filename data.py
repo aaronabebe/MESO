@@ -1,4 +1,5 @@
 import os
+import random
 
 import numpy as np
 import torch
@@ -6,11 +7,7 @@ import torchvision
 from PIL import Image
 from torchvision import transforms
 
-DEFAULT_DATA_DIR = './data'
-
-# from https://stackoverflow.com/questions/66678052/how-to-calculate-the-mean-and-the-std-of-cifar10-data
-CIFAR10_MEAN = (0.49139968, 0.48215841, 0.44653091)
-CIFAR10_STD = (0.24703223, 0.24348513, 0.26158784)
+from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD
 
 
 def get_dataloader(name: str, train: bool = True, **kwargs) -> torch.utils.data.DataLoader:
@@ -25,7 +22,7 @@ def get_dataloader(name: str, train: bool = True, **kwargs) -> torch.utils.data.
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
-def _get_cifar10c(cname: str, **kwargs):
+def _get_cifar10c(cname: str = random.choice(CIFAR_10_CORRUPTIONS), **kwargs):
     evalset = CIFAR10CDataset('./data/CIFAR-10-C', cname, tranform=_default_cifar10_transforms())
     return torch.utils.data.DataLoader(evalset, shuffle=False, num_workers=os.cpu_count(), **kwargs)
 

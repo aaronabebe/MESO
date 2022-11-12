@@ -110,7 +110,7 @@ def dino_attention(model, model_name, data):
     fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_attention.svg")
 
 
-def loss_landscape(model, model_name, data, steps=50):
+def loss_landscape(model, model_name, data, steps=40):
     # TODO switch impl to official repo implementation
     # TODO call via subcommand?
     metric = ll.metrics.Loss(torch.nn.CrossEntropyLoss(), data[0], data[1])
@@ -140,7 +140,7 @@ def loss_landscape(model, model_name, data, steps=50):
     ax.plot_surface(X, Y, loss_data, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
     ax.set_title('Surface Plot of Loss Landscape')
 
-    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}surface_3D.svg")
+    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}_surface_3D.svg")
 
 
 def show_img(img, ax, title):
