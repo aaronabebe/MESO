@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import pytorch_lightning as pl
 import torch
@@ -83,6 +84,7 @@ def main(args: argparse.Namespace):
             print('Please provide a type of visualization you want to do!')
         return
 
+    os.makedirs(TENSORBOARD_LOG_DIR, exist_ok=True)
     logger = pl.loggers.TensorBoardLogger(TENSORBOARD_LOG_DIR, name=args.model)
     net = Net(args)
     trainer = pl.Trainer(
