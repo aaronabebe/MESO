@@ -283,9 +283,8 @@ implementation [example](https://github.com/rwightman/pytorch-image-models/discu
 cleaned up code for different visualizations and model loading.
 fixed code for 3D surface creation in official loss landscapes library.
 looks even more wrong now, compared to the example from the official repo
-maybe because I used Adam instead of SGD? -> probably a good idea to replicate the official version first, 
+maybe because I used Adam instead of SGD? -> probably a good idea to replicate the official version first,
 to see if it even works?
-
 
 ![resnet50 loss landscape](../tb_logs/resnet50_cifar10/version_0/checkpoints/epoch=19-step=7820.ckpt_weights_xignore=biasbn_xnorm=filter_yignore=biasbn_ynorm=filter.h5_%5B-1.0,1.0,15%5Dx%5B-1.0,1.0,15%5D.h5_train_loss_3dsurface.svg)
 
@@ -294,7 +293,27 @@ creating loss landscape for VIT-T/8, seems to be a bit faster than ResNet50 due 
 
 check out talk about LL [youtube link](https://www.youtube.com/watch?v=98xPveYSMv4)
 
+## 13.11.2022
 
+trying to train Resnet50 on google colab to check if its faster
+loss landscapes still don't work correctly i think, or they are just always extremely smooth? makes no sense
+i also tried running on the test set and getting the test set loss, also tried with a very small stupid net,
+which i assumed would lead to bumpier loss surface, but in all cases we get no change
 
+trained resnet50 for 300 epochs on colab, worked waaaay faster, around 13it/s
+-> will prob use colab for training from now on
 
+also visualized loss landscape, but it still looks like all the other ones -> still no idea why
+
+will train a ViT-T overnight on 300 epochs as well, to compare and evaluate them, next up probably SAM/eSAM and ConvNeXt
+training
+
+also finished first draft of proposal today
+
+## 14.11.2022
+
+evaluating different model trainings including resnets, vits, found bug in 
+loss calculation, which led to weird eval results, hopefully fixed now, 
+reading some new papers as well, SimCLR, MAE
+also starting with DINO training implementation
 

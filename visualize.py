@@ -15,6 +15,18 @@ from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
 CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+CIFAR100_LABELS = (
+    'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy',
+    'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
+    'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
+    'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion', 'lizard',
+    'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid',
+    'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum',
+    'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper',
+    'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
+    'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf',
+    'woman', 'worm'
+)
 
 
 def grad_cam(model, model_name, data):
@@ -28,7 +40,7 @@ def grad_cam(model, model_name, data):
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]))
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5))
     fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
     fig.tight_layout()
 
@@ -38,6 +50,10 @@ def grad_cam(model, model_name, data):
         target_layer = [model.layer4[-1]]
 
     input_tensor = data[0][random_choice:random_choice + 1]
+
+    y = model(input_tensor)
+    preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
+
     cam = GradCAM(
         model=model,
         target_layers=target_layer,
@@ -50,6 +66,14 @@ def grad_cam(model, model_name, data):
 
     visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True)
     ax2.imshow(visualization)
+
+    ax3.axis('off')
+    ax3.axis('tight')
+    ax3.table(
+        [[p] for p in preds],
+        colLabels=[f'Top {len(preds)} predictions'],
+        loc='center',
+    )
 
     sub_dir_name = 'grad_cam'
     os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
@@ -68,8 +92,6 @@ def dino_attention(model, model_name, data):
     :param model_name:
     :return:
     """
-    if 'vit' not in model_name:
-        raise NotImplementedError('Attention visualization only works for ViT models.')
 
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]))
@@ -79,7 +101,10 @@ def dino_attention(model, model_name, data):
     # use only one image for now
     img = data[0][random_choice:random_choice + 1]
     y = model(img)
-    print('\n'.join([f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]))
+
+    # preds = [f'{CIFAR100_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
+    preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
+    print('\n'.join(preds))
 
     attn_map = model.blocks[-1].attn.attn_map.mean(dim=1).squeeze(0).detach()
     cls_weight = model.blocks[-1].attn.cls_attn_map.mean(dim=1).view(4, 4).detach()
@@ -87,7 +112,7 @@ def dino_attention(model, model_name, data):
     img_resized = img[0].permute(1, 2, 0) * 0.5 + 0.5
     cls_resized = F.interpolate(cls_weight.view(1, 1, 4, 4), (32, 32), mode='bilinear').view(32, 32, 1)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 6))
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(12, 6))
     fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
     fig.tight_layout()
 
@@ -102,6 +127,14 @@ def dino_attention(model, model_name, data):
     ax3.set_title('Last Block Attention Map')
     ax3.set_xlabel('Head')
     ax3.set_ylabel('Patch')
+
+    ax4.axis('off')
+    ax4.axis('tight')
+    ax4.table(
+        [[p] for p in preds],
+        colLabels=[f'Top {len(preds)} predictions'],
+        loc='center',
+    )
 
     plt.show()
 

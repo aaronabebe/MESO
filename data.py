@@ -32,7 +32,7 @@ def _get_cifar10(train: bool, **kwargs) -> torch.utils.data.DataLoader:
         root=DEFAULT_DATA_DIR,
         train=train,
         download=True,
-        transform=_default_cifar10_transforms() if train else _default_transforms((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transform=_default_cifar10_transforms()
     )
     return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=os.cpu_count(), **kwargs)
 

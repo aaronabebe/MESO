@@ -17,19 +17,15 @@ CIFAR_10_CORRUPTIONS = (
 
 
 def get_experiment_name(args):
-    name = f'{args.model}_{args.epochs}_{args.batch_size}'
+    name = f'{args.model}_e{args.epochs}_b{args.batch_size}_o{args.optimizer}_lr{args.learning_rate:.4f}_wd{args.weight_decay:4f}'
     return name
-
-
-def accuracy(y, y_hat, top_k=1):
-    return torch.eq(y_hat.argmax(-top_k), y).float().mean()
 
 
 def remove_prefix(state_dict, prefix):
     return {k[len(prefix):]: v for k, v in state_dict.items() if k.startswith(prefix)}
 
 
-def _get_latest_model_path(name):
+def get_latest_model_path(name):
     model_version_path = f'{TENSORBOARD_LOG_DIR}/{name}'
     latest_version = sorted(
         os.listdir(model_version_path),
@@ -37,6 +33,7 @@ def _get_latest_model_path(name):
         key=lambda x: int(x.split('_')[1])
     )[0]
     ckpt_path = glob.glob(f'{model_version_path}/{latest_version}/checkpoints/*.ckpt')[0]
+    print(f'Loading model from ckpt: {ckpt_path}')
     return ckpt_path
 
 
