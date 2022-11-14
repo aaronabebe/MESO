@@ -25,9 +25,9 @@ def get_args() -> argparse.Namespace:
                         help="Optimizer to use.")
     parser.add_argument("--sam", action='store_true', default=False,
                         help='Use SAM in conjunction with standard chosen optimizer.')
-    parser.add_argument("--learning_rate", type=float, default=0.1, help="Learning rate.")
+    parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate.")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum when training with SGD as optimizer.")
-    parser.add_argument("--scheduler", type=str, default='cosine', help="Learning rate decay for optimizer")
+    parser.add_argument("--scheduler", type=str, default=None, help="Learning rate decay for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.0005, help="Weight decay for optimizer")
     parser.add_argument("--lr_decay", type=float, default=0.5, help="Learning rate decay for optimizer")
     parser.add_argument("--warmup_steps", type=float, default=3, help="Warmup steps when using cosine LR scheduler.")
@@ -97,8 +97,8 @@ class Net(pl.LightningModule):
                 optimizer=optim, t_initial=self.args.learning_rate,
                 warmup_t=self.args.warmup_steps, decay_rate=self.args.lr_decay
             )
-
-        return [optim], [{"scheduler": scheduler, "interval": "epoch"}]
+            return [optim], [{"scheduler": scheduler, "interval": "epoch"}]
+        return optim
 
     def lr_scheduler_step(self, scheduler, optimizer_idx, metric) -> None:
         # timm scheduler needs epoch
@@ -137,7 +137,7 @@ def main(args: argparse.Namespace):
     val_loader = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
 
     if args.eval:
-        net.load_from_checkpoint(args.ckpt_path if args.ckpt_path else get_latest_model_path(args.model), args=args)
+        net.model = get_eval_model(args.model, args.ckpt_path)
         trainer.test(net, dataloaders=val_loader)
     else:
         trainer.fit(net, train_dataloaders=train_loader, val_dataloaders=val_loader)
