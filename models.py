@@ -3,6 +3,8 @@ import torch
 from timm.models import register_model, ResNet, Bottleneck
 from timm.models.vision_transformer import VisionTransformer
 from torch.nn import functional as F
+import pytorch_lightning as pl
+from torchmetrics.functional import accuracy
 
 from utils import remove_prefix, get_latest_model_path
 
@@ -17,17 +19,17 @@ def get_model(name: str, **kwargs) -> torch.nn.Module:
         return timm.create_model(name, pretrained_cfg=None, **kwargs)
 
 
-def get_eval_model(name: str, ckpt_path=None, **kwargs) -> torch.nn.Module:
+def get_eval_model(name: str, path_override=None, **kwargs) -> torch.nn.Module:
     """
     Returns a self trained model from the local model directory.
     :return:
     """
     model = get_model(name, **kwargs)
 
-    if not ckpt_path:
-        ckpt_path = get_latest_model_path(name)
+    if not path_override:
+        path_override = get_latest_model_path(name)
 
-    ckpt = torch.load(ckpt_path)
+    ckpt = torch.load(path_override)
 
     # remove prefix due to PL state dict naming
     if 'dino' in name:
@@ -85,3 +87,69 @@ class StupidNet(torch.nn.Module):
         x = x.view(x.size(0), -1)
         x = self.linear(x)
         return x
+
+
+class LitNet(pl.LightningModule):
+    def __init__(self, hparams):
+        super(LitNet, self).__init__()
+        self.args = hparams
+        self.model = get_model(hparams.model)
+
+    def forward(self, x):
+        return self.model(x)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat, y)
+
+        y_hat = torch.argmax(y_hat, dim=1)
+        acc = accuracy(y, y_hat, task='multiclass', num_classes=10, top_k=1)
+
+        self.log('train_loss', loss)
+        self.log("train_acc", acc)
+        return loss
+
+    def evaluate(self, batch, stage=None):
+        x, y = batch
+        y_hat = self(x)
+        loss = F.cross_entropy(y_hat, y)
+
+        y_hat = torch.argmax(y_hat, dim=1)
+        acc = accuracy(y, y_hat, task='multiclass', num_classes=10, top_k=1)
+
+        self.log(f'{stage}_loss', loss)
+        self.log(f'{stage}_acc', acc)
+
+    def test_step(self, batch, batch_idx):
+        self.evaluate(batch, stage='test')
+
+    def validation_step(self, batch, batch_idx):
+        self.evaluate(batch, stage='val')
+
+    def configure_optimizers(self):
+        if self.args.sam:
+            raise NotImplementedError('SAM is not working yet!')
+
+        if self.args.optimizer == 'adam':
+            optim = torch.optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'sgd':
+            optim = torch.optim.SGD(self.model.parameters(), lr=self.args.learning_rate,
+                                    weight_decay=self.args.weight_decay, momentum=self.args.momentum)
+        elif self.args.optimizer == 'adamw':
+            optim = torch.optim.AdamW(self.model.parameters(), lr=self.args.learning_rate,
+                                      weight_decay=self.args.weight_decay)
+        else:
+            raise Exception('Please specify valid optimizer!')
+
+        if self.args.scheduler == 'cosine':
+            scheduler = timm.scheduler.CosineLRScheduler(
+                optimizer=optim, t_initial=self.args.learning_rate,
+                warmup_t=self.args.warmup_steps, decay_rate=self.args.lr_decay
+            )
+            return [optim], [{"scheduler": scheduler, "interval": "epoch"}]
+        return optim
+
+    def lr_scheduler_step(self, scheduler, optimizer_idx, metric) -> None:
+        # timm scheduler needs epoch
+        scheduler.step(self.current_epoch)

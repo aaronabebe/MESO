@@ -1,6 +1,7 @@
 import torch
 import os
 import glob
+import argparse
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -8,12 +9,46 @@ DEFAULT_DATA_DIR = './data'
 # from https://stackoverflow.com/questions/66678052/how-to-calculate-the-mean-and-the-std-of-cifar10-data
 CIFAR10_MEAN = (0.49139968, 0.48215841, 0.44653091)
 CIFAR10_STD = (0.24703223, 0.24348513, 0.26158784)
+CIFAR10_SIZE = 32
 
 CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
     'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
     'spatter', 'speckle_noise', 'zoom_blur'
 )
+
+
+def get_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description='Run training for different ML experiments')
+    parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of epochs.")
+    parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
+    parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
+    parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
+
+    parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
+    parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
+    parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.4),
+                        help="Scale of local crops for DINO augmentation.")
+    parser.add_argument("--global_crops_scale", type=float, nargs='+', default=(0.5, 1.),
+                        help="Scale of global crops for DINO augmentation.")
+
+    parser.add_argument("--optimizer", type=str, default='sgd', choices=['sgd', 'adam', 'adamw'],
+                        help="Optimizer to use.")
+    parser.add_argument("--sam", action='store_true', default=False,
+                        help='Use SAM in conjunction with standard chosen optimizer.')
+    parser.add_argument("--learning_rate", type=float, default=0.01, help="Learning rate.")
+    parser.add_argument("--momentum", type=float, default=0.9, help="Momentum when training with SGD as optimizer.")
+    parser.add_argument("--scheduler", type=str, default=None, help="Learning rate decay for optimizer")
+    parser.add_argument("--weight_decay", type=float, default=0.0005, help="Weight decay for optimizer")
+    parser.add_argument("--lr_decay", type=float, default=0.5, help="Learning rate decay for optimizer")
+    parser.add_argument("--warmup_steps", type=float, default=3, help="Warmup steps when using cosine LR scheduler.")
+
+    parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
+    parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model.')
+    parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
+                        help="Visualize the loss landscape of the model.")
+    return parser.parse_args()
 
 
 def get_experiment_name(args):

@@ -2,7 +2,6 @@ import os
 import random
 import time
 
-import loss_landscapes as ll
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -11,7 +10,9 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch.nn import functional as F
 
-from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper
+from data import get_dataloader, default_transforms, default_cifar10_transforms, DinoTransforms
+from models import get_eval_model
+from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper, get_args
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
 CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -109,7 +110,7 @@ def dino_attention(model, model_name, data):
     attn_map = model.blocks[-1].attn.attn_map.mean(dim=1).squeeze(0).detach()
     cls_weight = model.blocks[-1].attn.cls_attn_map.mean(dim=1).view(4, 4).detach()
 
-    img_resized = img[0].permute(1, 2, 0) * 0.5 + 0.5
+    img_resized = reshape_for_plot(img[0])
     cls_resized = F.interpolate(cls_weight.view(1, 1, 4, 4), (32, 32), mode='bilinear').view(32, 32, 1)
 
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(12, 6))
@@ -138,62 +139,62 @@ def dino_attention(model, model_name, data):
 
     plt.show()
 
-    sub_dir_name = 'dino'
+    sub_dir_name = 'dino_attn'
     os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
     fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_attention.svg")
 
 
-def loss_landscape(model, model_name, data, steps=40):
-    # TODO switch impl to official repo implementation
-    # TODO call via subcommand?
-    metric = ll.metrics.Loss(torch.nn.CrossEntropyLoss(), data[0], data[1])
-    loss_data = ll.random_plane(
-        model=model,
-        metric=metric,
-        distance=10,
-        steps=steps,
-        normalization='filter',
-        deepcopy_model=True
-    )
-
-    sub_dir_name = 'loss_landscape'
-    os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
-
-    # plot 2D
-    plt.contour(loss_data, levels=50)
-    plt.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}_contour_2D.svg")
-    plt.clf()
-
-    # plot 3D
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-    # TODO optimize this
-    X = np.array([[j for j in range(steps)] for i in range(steps)])
-    Y = np.array([[i for _ in range(steps)] for i in range(steps)])
-    ax.plot_surface(X, Y, loss_data, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
-    ax.set_title('Surface Plot of Loss Landscape')
-
-    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}_surface_3D.svg")
+def reshape_for_plot(img):
+    return img.permute(1, 2, 0) * 0.5 + 0.5
 
 
-def show_img(img, ax, title):
-    """Shows a single image."""
-    if ax is None:
-        ax = plt.gca()
-    ax.imshow(img[...])
-    ax.set_xticks([])
-    ax.set_yticks([])
-    if title:
-        ax.set_title(title)
+def dino_augmentations(data):
+    """
+    Visualize the augmentations used in the DINO paper. Similarly to
+    https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/dino/visualize_augmentations.ipynb
+    """
 
+    # use only one random image for now
+    random_choice = random.randint(0, len(data[0]))
+    cropped_images = [s[random_choice] for s in data[0]]
 
-def show_img_grid(imgs, labels):
-    """Shows a grid of images."""
-    titles = [CIFAR10_LABELS[label] for label in labels]
-    n = int(np.ceil(len(imgs) ** .5))
-    _, axs = plt.subplots(n, n, figsize=(3 * n, 3 * n))
-    for i, (img, title) in enumerate(zip(imgs, titles)):
-        img = (img + 1) / 2  # Denormalize
-        img = np.transpose(img.numpy(), (1, 2, 0))
-        show_img(img, axs[i // n][i % n], title)
+    n = int(np.ceil(len(cropped_images) ** .5))
+    fig, axs = plt.subplots(n, n, figsize=(n * 3, n * 3))
+    fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+    for i, img in enumerate(cropped_images):
+        ax = axs[i // n][i % n]
+        ax.imshow(reshape_for_plot(img))
+        ax.axis("off")
+    fig.tight_layout()
+    sub_dir_name = 'dino_augs'
+    os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
+    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_attention.svg")
     plt.show()
+
+
+def main(args):
+    print(f'Visualizing {args.visualize} for {args.model} model...')
+
+    if args.visualize == 'dino_attn':
+        model = get_eval_model(args.model, path_override=args.ckpt_path)
+        dl = get_dataloader(args.dataset, transforms=default_cifar10_transforms, train=False,
+                            batch_size=args.batch_size)
+        data = next(iter(dl))
+        dino_attention(model, args.model, data)
+    elif args.visualize == 'dino_augs':
+        dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
+                                         args.global_crops_scale)
+        dl = get_dataloader(args.dataset, transforms=dino_transforms, train=False, batch_size=args.batch_size)
+        data = next(iter(dl))
+        dino_augmentations(data)
+    elif args.visualize == 'grad_cam':
+        model = get_eval_model(args.model, path_override=args.ckpt_path)
+        dl = get_dataloader(args.dataset, transforms=default_transforms, train=False, batch_size=args.batch_size)
+        data = next(iter(dl))
+        grad_cam(model, args.model, data)
+    else:
+        raise NotImplementedError(f'Visualization {args.visualize} not implemented.')
+
+
+if __name__ == '__main__':
+    main(get_args())
