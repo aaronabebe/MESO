@@ -10,7 +10,8 @@ from tqdm import tqdm
 
 from data import get_dataloader
 from models import get_eval_model
-from utils import eval_accuracy, CIFAR_10_CORRUPTIONS, reshape_for_plot, CIFAR10_STD, CIFAR10_MEAN
+from utils import eval_accuracy, CIFAR_10_CORRUPTIONS, CIFAR10_STD, CIFAR10_MEAN
+from visualize import CIFAR10_LABELS
 
 
 def parse_args():
@@ -33,7 +34,7 @@ def compute_embeddings(backbone, data_loader):
         img = img.to(device)
         embs_l.append(backbone(img).detach().cpu())
         imgs_l.append(((img * CIFAR10_STD[1]) + CIFAR10_MEAN[1]).cpu())  # undo norm
-        labels.extend([data_loader.dataset.classes[i] for i in y.tolist().reverse()])
+        labels.extend([CIFAR10_LABELS[i] for i in y.tolist()])
 
     embs = torch.cat(embs_l, dim=0)
     imgs = torch.cat(imgs_l, dim=0)

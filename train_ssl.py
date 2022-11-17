@@ -26,10 +26,12 @@ def main(args):
                                         batch_size=args.batch_size)
     val_loader_plain = get_dataloader(args.dataset, transforms=default_cifar10_transforms(), train=False,
                                       batch_size=args.batch_size)
-    val_loader_plain_subset = get_dataloader(args.dataset, transforms=default_cifar10_transforms(), train=False,
-                                             batch_size=args.batch_size,
-                                             sampler=SubsetRandomSampler(
-                                                 list(range(0, len(val_loader_plain.dataset), 50))))
+    val_loader_plain_subset = get_dataloader(
+        args.dataset, transforms=default_cifar10_transforms(),
+        train=False,
+        batch_size=args.batch_size,
+        sampler=SubsetRandomSampler(list(range(0, len(val_loader_plain), 50)))
+    )
 
     os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/', exist_ok=True)
     experiment_name = get_experiment_name(args)

@@ -90,7 +90,8 @@ class DinoTransforms:
         ])
 
         self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(input_size, scale=local_crops_scale,   # todo: should actually be input_size // 2
+            transforms.RandomResizedCrop(input_size, scale=local_crops_scale,
+                                         # todo: should actually be input_size // 2
                                          interpolation=InterpolationMode.BICUBIC),
             flip_and_color_jitter,
             RandomGaussianBlur(p=0.5),
