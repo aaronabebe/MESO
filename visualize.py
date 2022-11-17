@@ -12,7 +12,7 @@ from torch.nn import functional as F
 
 from data import get_dataloader, default_transforms, default_cifar10_transforms, DinoTransforms
 from models import get_eval_model
-from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper, get_args
+from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper, get_args, reshape_for_plot
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
 CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -144,8 +144,6 @@ def dino_attention(model, model_name, data):
     fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_attention.svg")
 
 
-def reshape_for_plot(img):
-    return img.permute(1, 2, 0) * 0.5 + 0.5
 
 
 def dino_augmentations(data):

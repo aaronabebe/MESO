@@ -312,8 +312,11 @@ also finished first draft of proposal today
 
 ## 14.11.2022
 
-evaluating different model trainings including resnets, vits, found bug in 
-loss calculation, which led to weird eval results, hopefully fixed now, 
+evaluating different model trainings including resnets, vits, found bug in
+loss calculation, which led to weird eval results, hopefully fixed now,
 reading some new papers as well, SimCLR, MAE
 also starting with DINO training implementation
 
+## 16.11.2022
+
+starting with implementation for dino training for cifar10, maybe imagenet-tiny afterwards
