@@ -148,6 +148,23 @@ class MLPHead(nn.Module):
         return x
 
 
+def clip_gradients(model, clip=2.0):
+    """Rescale norm of computed gradients.
+    Parameters
+    ----------
+    model : nn.Module
+        Module.
+    clip : float
+        Maximum norm.
+    """
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(2)
+            clip_coef = clip / (param_norm + 1e-6)
+            if clip_coef < 1:
+                p.grad.data.mul_(clip_coef)
+
+
 class DINOLoss(nn.Module):
     """
     taken from official dino implementation

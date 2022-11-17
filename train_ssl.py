@@ -11,7 +11,8 @@ from torch.utils.tensorboard import SummaryWriter
 from data import get_dataloader, DinoTransforms, default_cifar10_transforms
 from models import get_model
 from test import compute_embeddings, compute_knn
-from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, MultiCropWrapper, MLPHead, DINOLoss
+from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, MultiCropWrapper, MLPHead, DINOLoss, \
+    clip_gradients
 
 
 def main(args):
@@ -72,7 +73,7 @@ def main(args):
 
     # todo: lr/weight decay/momentum scheduler
 
-    # cifar10 trainset contains 50000 images
+    # cifar10 trainset contains 50000 imagefixed error in dataloaders
     n_batches = 50000 // args.batch_size
     best_acc = 0
     n_steps = 0
@@ -113,7 +114,7 @@ def main(args):
             optim.zero_grad()
             loss.backward()
             # todo: cancel gradients last layer?
-            # todo: clip gradients?
+            clip_gradients(student, 2.)
             optim.step()
 
             with torch.no_grad():
