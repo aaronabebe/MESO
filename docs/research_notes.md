@@ -320,3 +320,12 @@ also starting with DINO training implementation
 ## 16.11.2022
 
 starting with implementation for dino training for cifar10, maybe imagenet-tiny afterwards
+
+## 18.11.2022
+
+first dino implementation without warmup/proper scheduling doesnt converge, loss is stuck at around 6.35
+tried out adapted official implementation with cifar10, which seems to work, stopped training after 40 epochs
+-> will try to implement warmup and proper scheduling now
+-> also will try to implement official attn visualization, because mine looks very different/not as good
+
+

@@ -4,10 +4,14 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 
 ## TODOs
 
-- [ ] try loss landscapes with pre-trained model and compare to reference
-- [ ] implement cifar10-c evaluation
-- [ ] try out whole pipeline for simple model
-- [ ] implement visualization for attention maps
+- [x] try loss landscapes with pre-trained model and compare to reference
+- [x] implement cifar10-c evaluation
+- [x] try out whole pipeline for simple model
+- [x] implement visualization for attention maps
+- [x] implement dino paper first version
+- [x] implement proper consine scheduling, warmup, LR decay, weight decay, temperature decay
+- [ ] integrate official dino paper attn visualization
+- [ ] add vit impl from dino paper
 
 ## Prerequisites
 
