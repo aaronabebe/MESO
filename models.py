@@ -50,6 +50,16 @@ def vit_tiny_cifar10(pretrained=False, **kwargs):
 
 
 @register_model
+def vit_tiny_dino_cifar10(pretrained=False, **kwargs):
+    """
+    ViT-Tiny (Vit-T/8) for DINO CIFAR10 training
+    if pretrained = True then returns a Vit-T/16 pretrained on ImageNet with size 224.
+    """
+    return VisionTransformer(img_size=32, patch_size=4, num_classes=0, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
+                             **kwargs)
+
+
+@register_model
 def resnet26_cifar10(pretrained=False, **kwargs):
     if pretrained:
         raise NotImplementedError('No pretrained ResNets :-(')
