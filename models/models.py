@@ -51,9 +51,9 @@ def vit_tiny_cifar10(pretrained=False, **kwargs):
 
 
 @register_model
-def vit_tiny(pretrained=False, patch_size=16, **kwargs):
+def vit_tiny(pretrained=False, patch_size=4, **kwargs):
     model = VisionTransformer(
-        patch_size=patch_size, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4,
+        patch_size=patch_size, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 

@@ -37,6 +37,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
     parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
     parser.add_argument("--num_classes", type=int, default=10, help="Number of classes in the dataset.")
+    parser.add_argument("--patch_size", type=int, default=4, help="Patch size for ViT.")
 
     parser.add_argument("--in_dim", type=int, default=192, help="Size of DINO MLPHead hidden layer input dims")
     parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
@@ -81,6 +82,7 @@ def get_args() -> argparse.Namespace:
 
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model.')
+    parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
     parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
                         help="Visualize the loss landscape of the model.")
     return parser.parse_args()

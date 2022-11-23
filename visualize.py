@@ -86,13 +86,13 @@ def grad_cam(model, model_name, data):
     plt.show()
 
 
-def dino_attention(model, model_name, data):
+def dino_attention(model, patch_size, data):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
     :param model:
     :param data:
-    :param model_name:
+    :param patch_size:
     :return:
     """
 
@@ -102,7 +102,7 @@ def dino_attention(model, model_name, data):
     # use only one image for now
     img = data[0][random_choice]
 
-    patch_size = 16
+    patch_size = patch_size
     # make the image divisible by the patch size
     w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
     img = img[:, :w, :h].unsqueeze(0)
@@ -169,12 +169,13 @@ def main(args):
             path_override=args.ckpt_path,
             in_chans=args.input_channels,
             num_classes=0,
+            patch_size=args.patch_size if 'vit' in args.model else None,
             img_size=32
         )
         dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size), train=False,
                             batch_size=args.batch_size)
         data = next(iter(dl))
-        dino_attention(model, args.model, data)
+        dino_attention(model, args.patch_size, data)
     elif args.visualize == 'dino_augs':
         mean, std = get_mean_std(args.dataset)
         dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,

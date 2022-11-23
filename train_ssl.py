@@ -15,11 +15,17 @@ from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradient
 from models.models import get_model
 from test import compute_embeddings, compute_knn
 from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name
+from visualize import dino_attention
 
 
 def main(args):
     pprint.pprint(vars(args))
     device = torch.device(args.device)
+
+    if args.wandb:
+        import wandb
+        wandb.init(project="dino", config=vars(args))
+        wandb.watch_called = False
 
     mean, std = get_mean_std(args.dataset)
     transforms = DinoTransforms(
@@ -55,6 +61,7 @@ def main(args):
         args.model,
         in_chans=args.input_channels,
         num_classes=args.num_classes,
+        patch_size=args.patch_size if 'vit' in args.model else None,
         img_size=args.input_size if 'vit' in args.model else None
     )
     student = MultiCropWrapper(student, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
@@ -64,10 +71,12 @@ def main(args):
         args.model,
         in_chans=args.input_channels,
         num_classes=args.num_classes,
+        patch_size=args.patch_size if 'vit' in args.model else None,
         img_size=args.input_size if 'vit' in args.model else None
     )
     teacher = MultiCropWrapper(teacher, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
     teacher = teacher.to(device)
+    writer.add_text('model_summary', repr(student))
 
     # teacher gets student weights and doesnt learn
     teacher.load_state_dict(student.state_dict())
@@ -118,18 +127,26 @@ def main(args):
     for epoch in range(args.epochs):
         print('Evaluating on validation set...')
         student.eval()
-        embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
-        writer.add_embedding(
-            embs,
-            metadata=labels,
-            label_img=imgs,
-            global_step=n_steps,
-            tag="embedding"
-        )
+
+        # compute embeddings for tensorboard
+        # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
+        # writer.add_embedding(
+        #     embs,
+        #     metadata=labels,
+        #     label_img=imgs,
+        #     global_step=n_steps,
+        #     tag="embedding"
+        # )
 
         # knn eval
         current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
         writer.add_scalar('knn_acc', current_acc, n_steps)
+        if args.wandb:
+            wandb.log({'knn_acc': current_acc}, step=n_steps)
+
+        # TODO visualize current attention maps
+        # dino_attention(student.backbone, args.patch_size, next(iter(val_loader_plain_subset)))
+
         if current_acc > best_acc:
             save_dict = {
                 'student': student.state_dict(),
@@ -174,8 +191,13 @@ def main(args):
             writer.add_scalar("train_loss", loss.item(), n_steps)
             writer.add_scalar("lr", optim.param_groups[0]['lr'], n_steps)
             writer.add_scalar("weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
+            if args.wandb:
+                wandb.log({
+                    "train_loss": loss.item(),
+                    "lr": optim.param_groups[0]['lr'],
+                    "weight_decay": optim.param_groups[0]['weight_decay'],
+                }, step=n_steps)
             n_steps += 1
-
 
 
 if __name__ == '__main__':

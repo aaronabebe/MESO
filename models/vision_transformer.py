@@ -49,7 +49,6 @@ class Attention(nn.Module):
         x = (attn @ v).transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)
         x = self.proj_drop(x)
-        print('ATTN', x.shape, attn.shape)
         return x, attn
 
 
@@ -66,8 +65,6 @@ class Block(nn.Module):
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
     def forward(self, x, return_attention=False):
-        print('-----------------------------')
-        print('BLK', [i.shape for i in self.attn(self.norm1(x))])
         y, attn = self.attn(self.norm1(x))
         if return_attention:
             return attn
@@ -107,7 +104,6 @@ class VisionTransformer(nn.Module):
         self.patch_embed = PatchEmbed(
             img_size=img_size, patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim)
         num_patches = self.patch_embed.num_patches
-        print('NUM', num_patches)
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim))
@@ -160,7 +156,6 @@ class VisionTransformer(nn.Module):
         return torch.cat((class_pos_embed.unsqueeze(0), patch_pos_embed), dim=1)
 
     def prepare_tokens(self, x):
-        print(x.shape)
         B, nc, w, h = x.shape
         x = self.patch_embed(x)  # patch linear embedding
 
