@@ -4,7 +4,7 @@ import os
 import pytorch_lightning as pl
 
 from data import get_dataloader, default_cifar10_transforms, default_transforms
-from models import get_eval_model, LitNet
+from models.models import get_eval_model, LitNet
 from utils import TENSORBOARD_LOG_DIR, get_experiment_name, get_args
 
 

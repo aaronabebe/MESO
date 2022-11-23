@@ -1,12 +1,16 @@
+from functools import partial
+
+import pytorch_lightning as pl
 import timm
 import torch
 from timm.models import register_model, ResNet, Bottleneck
-from timm.models.vision_transformer import VisionTransformer
+from torch import nn
 from torch.nn import functional as F
-import pytorch_lightning as pl
 from torchmetrics.functional import accuracy
 
 from utils import remove_prefix, get_latest_model_path
+from models.convnext import ConvNeXt
+from models.vision_transformer import VisionTransformer
 
 
 def get_model(name: str, **kwargs) -> torch.nn.Module:
@@ -30,13 +34,10 @@ def get_eval_model(name: str, path_override=None, **kwargs) -> torch.nn.Module:
         path_override = get_latest_model_path(name)
 
     ckpt = torch.load(path_override)
-
-    # remove prefix due to PL state dict naming
-    if 'dino' in name:
-        model.load_state_dict(remove_prefix(ckpt, 'module.'))
-    else:
-        model.load_state_dict(remove_prefix(ckpt['state_dict'], 'model.'))
+    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'))
     model.eval()
+    for p in model.parameters():
+        p.requires_grad = False
     return model
 
 
@@ -50,6 +51,19 @@ def vit_tiny_cifar10(pretrained=False, **kwargs):
 
 
 @register_model
+def vit_tiny(pretrained=False, patch_size=16, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size, embed_dim=192, depth=12, num_heads=3, mlp_ratio=4,
+        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
+
+
+@register_model
+def convnext_tiny(pretrained=False, pretrained_cfg=None, **kwargs):
+    return ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
+
+
+@register_model
 def vit_tiny_dino_cifar10(pretrained=False, **kwargs):
     """
     ViT-Tiny (Vit-T/8) for DINO CIFAR10 training
@@ -57,14 +71,6 @@ def vit_tiny_dino_cifar10(pretrained=False, **kwargs):
     """
     return VisionTransformer(img_size=32, patch_size=4, num_classes=0, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
                              **kwargs)
-
-
-@register_model
-def resnet26_cifar10(pretrained=False, **kwargs):
-    if pretrained:
-        raise NotImplementedError('No pretrained ResNets :-(')
-
-    return ResNet(block=Bottleneck, layers=[2, 2, 2, 2], num_classes=10, **kwargs)
 
 
 @register_model

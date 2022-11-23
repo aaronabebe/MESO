@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from tqdm import tqdm
 
 from data import get_dataloader
-from models import get_eval_model
+from models.models import get_eval_model
 from utils import eval_accuracy, CIFAR_10_CORRUPTIONS, CIFAR10_STD, CIFAR10_MEAN
 from visualize import CIFAR10_LABELS
 

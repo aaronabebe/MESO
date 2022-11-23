@@ -328,4 +328,19 @@ tried out adapted official implementation with cifar10, which seems to work, sto
 -> will try to implement warmup and proper scheduling now
 -> also will try to implement official attn visualization, because mine looks very different/not as good
 
+## 19.11.2022
 
+implements warmup and proper scheduling, loss looks better now for short training run, got memory problems now due to
+batch sizes
+starting on convnext implementation now
+
+
+## 23.11.2022
+
+implemented convnext, training now, also implemented official attention visualization, which looks very different
+
+kleines datenset overfitten zum testen der implementierung
+
+loss landscapes: mnist versuchen + mpi versuchen
+
+vincze wegen tu hardware schreiben

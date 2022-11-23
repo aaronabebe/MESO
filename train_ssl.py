@@ -2,36 +2,45 @@ import json
 import math
 import os
 import sys
+import pprint
 
 import torch
 import tqdm
 from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from data import get_dataloader, DinoTransforms, default_cifar10_transforms
+from data import get_dataloader, DinoTransforms, get_mean_std
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
-from models import get_model
+from models.models import get_model
 from test import compute_embeddings, compute_knn
 from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name
 
 
 def main(args):
-    print(vars(args))
+    pprint.pprint(vars(args))
     device = torch.device(args.device)
 
-    transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
-                                args.global_crops_scale)
+    mean, std = get_mean_std(args.dataset)
+    transforms = DinoTransforms(
+        args.input_size,
+        args.n_local_crops,
+        args.local_crops_scale,
+        args.global_crops_scale,
+        mean=mean,
+        std=std
+    )
+
     train_loader = get_dataloader(args.dataset, transforms=transforms, train=True,
                                   batch_size=args.batch_size)
-    train_loader_plain = get_dataloader(args.dataset, transforms=default_cifar10_transforms(), train=True,
+    train_loader_plain = get_dataloader(args.dataset, train=True,
                                         batch_size=args.batch_size)
-    val_loader_plain = get_dataloader(args.dataset, transforms=default_cifar10_transforms(), train=False,
+    val_loader_plain = get_dataloader(args.dataset, train=False,
                                       batch_size=args.batch_size)
 
     # sample one random batch for embedding visualization
     val_loader_plain_subset = get_dataloader(
-        args.dataset, transforms=default_cifar10_transforms(),
+        args.dataset,
         train=False,
         batch_size=args.batch_size,
         sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=args.batch_size)
@@ -42,12 +51,22 @@ def main(args):
     writer = SummaryWriter(f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}')
     writer.add_text("args", json.dumps(vars(args)))
 
-    student = get_model(args.model)
-    student = MultiCropWrapper(student, MLPHead(in_dim=192, out_dim=args.out_dim))
+    student = get_model(
+        args.model,
+        in_chans=args.input_channels,
+        num_classes=args.num_classes,
+        img_size=args.input_size if 'vit' in args.model else None
+    )
+    student = MultiCropWrapper(student, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
     student = student.to(device)
 
-    teacher = get_model(args.model)
-    teacher = MultiCropWrapper(teacher, MLPHead(in_dim=192, out_dim=args.out_dim))
+    teacher = get_model(
+        args.model,
+        in_chans=args.input_channels,
+        num_classes=args.num_classes,
+        img_size=args.input_size if 'vit' in args.model else None
+    )
+    teacher = MultiCropWrapper(teacher, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
     teacher = teacher.to(device)
 
     # teacher gets student weights and doesnt learn
@@ -68,6 +87,7 @@ def main(args):
     if args.optimizer == 'adam':
         optim = torch.optim.Adam(params)
     elif args.optimizer == 'sgd':
+        # lr gets set by scheduler
         optim = torch.optim.SGD(params, lr=0, weight_decay=args.weight_decay, momentum=args.momentum)
     elif args.optimizer == 'adamw':
         optim = torch.optim.AdamW(params)
@@ -90,41 +110,39 @@ def main(args):
     momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
     print(f"Loss, optimizer and schedulers ready.")
 
-    # cifar10 trainset contains 50000 imagefixed error in dataloaders
+    # cifar10 trainset contains 50000 images
     n_batches = 50000 // args.batch_size
     best_acc = 0
     n_steps = 0
 
     for epoch in range(args.epochs):
+        print('Evaluating on validation set...')
+        student.eval()
+        embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
+        writer.add_embedding(
+            embs,
+            metadata=labels,
+            label_img=imgs,
+            global_step=n_steps,
+            tag="embedding"
+        )
+
+        # knn eval
+        current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
+        writer.add_scalar('knn_acc', current_acc, n_steps)
+        if current_acc > best_acc:
+            save_dict = {
+                'student': student.state_dict(),
+                'teacher': teacher.state_dict(),
+                'optimizer': optim.state_dict(),
+                'epoch': epoch + 1,
+                'args': args,
+                'dino_loss': dino_loss.state_dict(),
+            }
+            torch.save(save_dict, f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth')
+            best_acc = current_acc
+        student.train()
         for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches):
-            if n_steps > 1 and n_steps % 1000 == 0:
-                print('Evaluating on validation set...')
-                student.eval()
-                embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
-                writer.add_embedding(
-                    embs,
-                    metadata=labels,
-                    label_img=imgs,
-                    global_step=n_steps,
-                    tag="embedding"
-                )
-
-                # knn eval
-                current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
-                writer.add_scalar('knn_acc', current_acc, n_steps)
-                if current_acc > best_acc:
-                    save_dict = {
-                        'student': student.state_dict(),
-                        'teacher': teacher.state_dict(),
-                        'optimizer': optim.state_dict(),
-                        'epoch': epoch + 1,
-                        'args': args,
-                        'dino_loss': dino_loss.state_dict(),
-                    }
-                    torch.save(save_dict, f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth')
-                    best_acc = current_acc
-                student.train()
-
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):
                 param_group["lr"] = lr_schedule[it]
@@ -157,6 +175,7 @@ def main(args):
             writer.add_scalar("lr", optim.param_groups[0]['lr'], n_steps)
             writer.add_scalar("weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
             n_steps += 1
+
 
 
 if __name__ == '__main__':

@@ -10,8 +10,8 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch.nn import functional as F
 
-from data import get_dataloader, default_transforms, default_cifar10_transforms, DinoTransforms
-from models import get_eval_model
+from data import get_dataloader, default_transforms, default_cifar10_transforms, DinoTransforms, get_mean_std
+from models.models import get_eval_model
 from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper, get_args, reshape_for_plot
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
@@ -27,6 +27,9 @@ CIFAR100_LABELS = (
     'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
     'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf',
     'woman', 'worm'
+)
+FASHION_MNIST_LABELS = (
+    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
 )
 
 
@@ -85,9 +88,8 @@ def grad_cam(model, model_name, data):
 
 def dino_attention(model, model_name, data):
     """
-    Visualize the self attention of a transformer model, similar to the DINO paper.
+    Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
-    https://github.com/rwightman/pytorch-image-models/discussions/1232
     :param model:
     :param data:
     :param model_name:
@@ -97,53 +99,41 @@ def dino_attention(model, model_name, data):
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]))
 
-    model.blocks[-1].attn.forward = attention_viz_forward_wrapper(model.blocks[-1].attn)
-
     # use only one image for now
-    img = data[0][random_choice:random_choice + 1]
-    y = model(img)
+    img = data[0][random_choice]
 
-    # preds = [f'{CIFAR100_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
-    preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
-    print('\n'.join(preds))
+    patch_size = 16
+    # make the image divisible by the patch size
+    w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
+    img = img[:, :w, :h].unsqueeze(0)
 
-    attn_map = model.blocks[-1].attn.attn_map.mean(dim=1).squeeze(0).detach()
-    cls_weight = model.blocks[-1].attn.cls_attn_map.mean(dim=1).view(4, 4).detach()
+    w_featmap = img.shape[-2] // patch_size
+    h_featmap = img.shape[-1] // patch_size
 
-    img_resized = reshape_for_plot(img[0])
-    cls_resized = F.interpolate(cls_weight.view(1, 1, 4, 4), (32, 32), mode='bilinear').view(32, 32, 1)
+    attentions = model.get_last_selfattention(img)
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(12, 6))
-    fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
+    nh = attentions.shape[1]  # number of head
+
+    # we keep only the output patch attention
+    attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
+    attentions = attentions.reshape(nh, w_featmap, h_featmap)
+    attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
+
+    fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+    fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+    for i in range(nh):
+        ax = axs[i]
+        ax.imshow(attentions[i])
+        ax.axis("off")
+
+    last = axs[-1]
+    last.imshow(reshape_for_plot(img[0].cpu()))
+
     fig.tight_layout()
-
-    ax1.imshow(img_resized)
-
-    ax2.imshow(cls_resized)
-    ax2.set_title('Class Attention Map')
-    ax2.set_xlabel('Patch')
-    ax2.set_ylabel('Patch')
-
-    ax3.imshow(attn_map)
-    ax3.set_title('Last Block Attention Map')
-    ax3.set_xlabel('Head')
-    ax3.set_ylabel('Patch')
-
-    ax4.axis('off')
-    ax4.axis('tight')
-    ax4.table(
-        [[p] for p in preds],
-        colLabels=[f'Top {len(preds)} predictions'],
-        loc='center',
-    )
-
-    plt.show()
-
     sub_dir_name = 'dino_attn'
-    os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
-    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_attention.svg")
-
-
+    os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
+    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_attention.svg")
+    plt.show()
 
 
 def dino_augmentations(data):
@@ -174,20 +164,27 @@ def main(args):
     print(f'Visualizing {args.visualize} for {args.model} model...')
 
     if args.visualize == 'dino_attn':
-        model = get_eval_model(args.model, path_override=args.ckpt_path)
-        dl = get_dataloader(args.dataset, transforms=default_cifar10_transforms, train=False,
+        model = get_eval_model(
+            args.model,
+            path_override=args.ckpt_path,
+            in_chans=args.input_channels,
+            num_classes=0,
+            img_size=32
+        )
+        dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size), train=False,
                             batch_size=args.batch_size)
         data = next(iter(dl))
         dino_attention(model, args.model, data)
     elif args.visualize == 'dino_augs':
+        mean, std = get_mean_std(args.dataset)
         dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
-                                         args.global_crops_scale)
+                                         args.global_crops_scale, mean=mean, std=std)
         dl = get_dataloader(args.dataset, transforms=dino_transforms, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
         dino_augmentations(data)
     elif args.visualize == 'grad_cam':
         model = get_eval_model(args.model, path_override=args.ckpt_path)
-        dl = get_dataloader(args.dataset, transforms=default_transforms, train=False, batch_size=args.batch_size)
+        dl = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
         grad_cam(model, args.model, data)
     else:

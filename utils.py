@@ -2,10 +2,7 @@ import argparse
 import glob
 import os
 
-import numpy as np
 import torch
-from torch import nn
-from torch.nn import functional as F
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -14,6 +11,13 @@ DEFAULT_DATA_DIR = './data'
 CIFAR10_MEAN = (0.49139968, 0.48215841, 0.44653091)
 CIFAR10_STD = (0.24703223, 0.24348513, 0.26158784)
 CIFAR10_SIZE = 32
+
+MNIST_MEAN = (0.1307,)
+MNIST_STD = (0.3081,)
+MNIST_SIZE = 28
+
+FASHION_MNIST_MEAN = (0.2860,)
+FASHION_MNIST_STD = (0.3530,)
 
 CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
@@ -31,14 +35,16 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
 
     parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
-    parser.add_argument("--out_dim", type=int, default=1024, help="Size of hidden layer output dims")
+    parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
+    parser.add_argument("--num_classes", type=int, default=10, help="Number of classes in the dataset.")
+
+    parser.add_argument("--in_dim", type=int, default=192, help="Size of DINO MLPHead hidden layer input dims")
+    parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
     parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.4),
                         help="Scale of local crops for DINO augmentation.")
     parser.add_argument("--global_crops_scale", type=float, nargs='+', default=(0.5, 1.),
                         help="Scale of global crops for DINO augmentation.")
-
-    # Temperature teacher parameters
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
                         help="""Initial value for the teacher temperature: 0.04 works well in most cases.
             Try decreasing it if the training loss does not decrease.""")
@@ -51,9 +57,10 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--teacher_temp', default=0.04, type=float, help="""Final value (after linear warmup)
             of the teacher temperature. For most experiments, anything above 0.07 is unstable. We recommend
             starting with the default value of 0.04 and increase this slightly if needed.""")
+    parser.add_argument("--momentum_teacher", type=float, default=0.9995, help="Momentum for the DINO teacher model.")
     parser.add_argument('--warmup_teacher_temp_epochs', default=0, type=int,
                         help='Number of warmup epochs for the teacher temperature (Default: 10).')
-    parser.add_argument("--warmup_epochs", default=10, type=int,
+    parser.add_argument("--warmup_epochs", default=5, type=int,
                         help="Number of epochs for the linear learning-rate warm up.")
 
     parser.add_argument("--optimizer", type=str, default='sgd', choices=['sgd', 'adam', 'adamw'],
@@ -64,7 +71,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--min_lr', type=float, default=1e-6, help="""Target LR at the
         end of optimization. We use a cosine LR schedule with linear warmup.""")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum when training with SGD as optimizer.")
-    parser.add_argument("--momentum_teacher", type=float, default=0.9995, help="Momentum for the DINO teacher model.")
     parser.add_argument("--scheduler", type=str, default=None, help="Learning rate decay for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.04, help="Weight decay for optimizer")
     parser.add_argument('--weight_decay_end', type=float, default=0.4, help="""Final value of the
