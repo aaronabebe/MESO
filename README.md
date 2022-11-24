@@ -13,8 +13,13 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [x] test dino with resnet -> convnext
 - [x] integrate official dino paper attn visualization
 - [x] add vit impl from dino paper
-- [ ] overfit on small dataset
 - [ ] fix tensorboard embedding visualizations
+
+- [ ] overfit on single batch
+- [ ] add continue from checkpoint
+- [ ] add train scripts for finetuning self-supervised models
+- [ ] add fixed seeds
+
 
 ## Prerequisites
 

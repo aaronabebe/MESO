@@ -344,3 +344,11 @@ kleines datenset overfitten zum testen der implementierung
 loss landscapes: mnist versuchen + mpi versuchen
 
 vincze wegen tu hardware schreiben
+
+## 24.11.2022
+
+setup wandb to log 
+testing different training configurations and datasets for a few epochs in colab to see if everything seems to work correctly
+
+checking andrej karpathys training recipe for reference [link to his blog](http://karpathy.github.io/2019/04/25/recipe/)
+
