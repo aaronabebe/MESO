@@ -5,6 +5,10 @@ import sys
 import pprint
 
 import torch
+
+# enable if dataloaders run into "too many open files" error
+# torch.multiprocessing.set_sharing_strategy('file_system')
+
 import tqdm
 from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -48,7 +52,7 @@ def main(args):
     val_loader_plain_subset = get_dataloader(
         args.dataset,
         train=False,
-        batch_size=args.batch_size,
+        batch_size=1,
         transforms=default_transforms(480, *get_mean_std(args.dataset)),  # using a larger input size for visualization
         sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=args.batch_size)
     )
@@ -121,13 +125,12 @@ def main(args):
 
     # cifar10 trainset contains 50000 images
     n_batches = len(train_loader.dataset) // args.batch_size
-    print('n_batches', n_batches)
     best_acc = 0
     n_steps = 0
 
     for epoch in range(args.epochs):
         print('Evaluating on validation set...')
-        student.eval()
+        teacher.eval()
 
         # TODO fix this: compute embeddings for tensorboard
         # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
@@ -140,14 +143,16 @@ def main(args):
         # )
 
         # knn eval
-        current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
+        current_acc = compute_knn(teacher.backbone, train_loader_plain, val_loader_plain)
         writer.add_scalar('knn_acc', current_acc, n_steps)
         if args.wandb:
             wandb.log({'knn_acc': current_acc}, step=n_steps)
 
-        test_viz_data = next(iter(val_loader_plain_subset))
-        _, attentions = dino_attention(student.backbone, args.patch_size, test_viz_data, plot=False)
+        images, labels = next(iter(val_loader_plain_subset))
+        images, labels = images.to(device), labels.to(device)
+        orig, attentions = dino_attention(teacher.backbone, args.patch_size, (images, labels), plot=False)
         if args.wandb:
+            wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
             wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
 
         if current_acc > best_acc:
@@ -167,7 +172,8 @@ def main(args):
                 wandb.log_artifact(artifact)
 
             best_acc = current_acc
-        student.train()
+        teacher.train()
+
         for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches):
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):

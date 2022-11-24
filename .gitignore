@@ -4,6 +4,7 @@
 tb_logs/
 data/
 plots/
+wandb/
 
 
 # Byte-compiled / optimized / DLL files
