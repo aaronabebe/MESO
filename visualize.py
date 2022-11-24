@@ -86,14 +86,10 @@ def grad_cam(model, model_name, data):
     plt.show()
 
 
-def dino_attention(model, patch_size, data):
+def dino_attention(model, patch_size, data, plot=True):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
-    :param model:
-    :param data:
-    :param patch_size:
-    :return:
     """
 
     # use only one random image for now
@@ -123,7 +119,7 @@ def dino_attention(model, patch_size, data):
     fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
     for i in range(nh):
         ax = axs[i]
-        ax.imshow(attentions[i])
+        ax.imshow(attentions[i].detach().numpy())
         ax.axis("off")
 
     last = axs[-1]
@@ -133,7 +129,11 @@ def dino_attention(model, patch_size, data):
     sub_dir_name = 'dino_attn'
     os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
     fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_attention.svg")
-    plt.show()
+
+    if plot:
+        plt.show()
+
+    return img[0], attentions
 
 
 def dino_augmentations(data):
@@ -166,13 +166,15 @@ def main(args):
     if args.visualize == 'dino_attn':
         model = get_eval_model(
             args.model,
+            args.device,
             path_override=args.ckpt_path,
             in_chans=args.input_channels,
             num_classes=0,
             patch_size=args.patch_size if 'vit' in args.model else None,
             img_size=32
         )
-        dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size), train=False,
+        dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size, *get_mean_std(args.dataset)),
+                            train=False,
                             batch_size=args.batch_size)
         data = next(iter(dl))
         dino_attention(model, args.patch_size, data)
@@ -184,7 +186,15 @@ def main(args):
         data = next(iter(dl))
         dino_augmentations(data)
     elif args.visualize == 'grad_cam':
-        model = get_eval_model(args.model, path_override=args.ckpt_path)
+        model = get_eval_model(
+            args.model,
+            args.device,
+            path_override=args.ckpt_path,
+            in_chans=args.input_channels,
+            num_classes=args.num_classes,
+            patch_size=args.patch_size if 'vit' in args.model else None,
+            img_size=args.input_size
+        )
         dl = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
         grad_cam(model, args.model, data)

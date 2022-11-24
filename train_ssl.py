@@ -9,7 +9,7 @@ import tqdm
 from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
-from data import get_dataloader, DinoTransforms, get_mean_std
+from data import get_dataloader, DinoTransforms, get_mean_std, default_transforms
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
 from models.models import get_model
@@ -49,6 +49,7 @@ def main(args):
         args.dataset,
         train=False,
         batch_size=args.batch_size,
+        transforms=default_transforms(480, *get_mean_std(args.dataset)),  # using a larger input size for visualization
         sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=args.batch_size)
     )
 
@@ -76,7 +77,6 @@ def main(args):
     )
     teacher = MultiCropWrapper(teacher, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
     teacher = teacher.to(device)
-    writer.add_text('model_summary', repr(student))
 
     # teacher gets student weights and doesnt learn
     teacher.load_state_dict(student.state_dict())
@@ -120,7 +120,8 @@ def main(args):
     print(f"Loss, optimizer and schedulers ready.")
 
     # cifar10 trainset contains 50000 images
-    n_batches = 50000 // args.batch_size
+    n_batches = len(train_loader.dataset) // args.batch_size
+    print('n_batches', n_batches)
     best_acc = 0
     n_steps = 0
 
@@ -128,7 +129,7 @@ def main(args):
         print('Evaluating on validation set...')
         student.eval()
 
-        # compute embeddings for tensorboard
+        # TODO fix this: compute embeddings for tensorboard
         # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
         # writer.add_embedding(
         #     embs,
@@ -144,8 +145,10 @@ def main(args):
         if args.wandb:
             wandb.log({'knn_acc': current_acc}, step=n_steps)
 
-        # TODO visualize current attention maps
-        # dino_attention(student.backbone, args.patch_size, next(iter(val_loader_plain_subset)))
+        test_viz_data = next(iter(val_loader_plain_subset))
+        _, attentions = dino_attention(student.backbone, args.patch_size, test_viz_data, plot=False)
+        if args.wandb:
+            wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
 
         if current_acc > best_acc:
             save_dict = {
@@ -156,7 +159,13 @@ def main(args):
                 'args': args,
                 'dino_loss': dino_loss.state_dict(),
             }
-            torch.save(save_dict, f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth')
+            save_path = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth'
+            torch.save(save_dict, save_path)
+            if args.wandb:
+                artifact = wandb.Artifact('model', type='model')
+                artifact.add_file(save_path)
+                wandb.log_artifact(artifact)
+
             best_acc = current_acc
         student.train()
         for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches):

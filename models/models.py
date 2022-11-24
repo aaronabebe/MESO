@@ -23,7 +23,7 @@ def get_model(name: str, **kwargs) -> torch.nn.Module:
         return timm.create_model(name, pretrained_cfg=None, **kwargs)
 
 
-def get_eval_model(name: str, path_override=None, **kwargs) -> torch.nn.Module:
+def get_eval_model(name: str, device: torch.device, path_override=None, **kwargs) -> torch.nn.Module:
     """
     Returns a self trained model from the local model directory.
     :return:
@@ -33,7 +33,7 @@ def get_eval_model(name: str, path_override=None, **kwargs) -> torch.nn.Module:
     if not path_override:
         path_override = get_latest_model_path(name)
 
-    ckpt = torch.load(path_override)
+    ckpt = torch.load(path_override, map_location=device)
     model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'))
     model.eval()
     for p in model.parameters():
