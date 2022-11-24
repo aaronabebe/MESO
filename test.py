@@ -43,6 +43,7 @@ def compute_embeddings(backbone, data_loader):
 
 
 def compute_knn(backbone, train_loader_plain, val_loader_plain):
+    return 0
     device = next(backbone.parameters()).device
 
     data_loaders = {
@@ -56,15 +57,15 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
         "y_val": [],
     }
 
-    for name, data_loader in data_loaders.items():
-        for imgs, y in data_loader:
+    for name, data_loader in tqdm(data_loaders.items(), position=3, desc=" evaluating knn"):
+        for imgs, y in tqdm(data_loader, position=4, desc=" eval batch"):
             imgs = imgs.to(device)
             lists[f"X_{name}"].append(backbone(imgs).detach().cpu().numpy())
             lists[f"y_{name}"].append(y.detach().cpu().numpy())
 
     arrays = {k: np.concatenate(l) for k, l in lists.items()}
 
-    estimator = KNeighborsClassifier()
+    estimator = KNeighborsClassifier(algorithm='ball_tree')
     estimator.fit(arrays["X_train"], arrays["y_train"])
     y_val_pred = estimator.predict(arrays["X_val"])
 

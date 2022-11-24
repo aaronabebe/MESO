@@ -52,7 +52,7 @@ def main(args):
         args.dataset,
         train=False,
         batch_size=1,
-        transforms=default_transforms(480) if args.input_channels == 3 else default_transforms(input_size, (0.5,) (0.5, )),  # using a larger input size for visualization
+        transforms=default_transforms(480) if args.input_channels == 3 else default_transforms(input_size, (0.5,), (0.5, )),  # using a larger input size for visualization
         sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=args.batch_size)
     )
 
@@ -85,6 +85,7 @@ def main(args):
     teacher.load_state_dict(student.state_dict())
     for param in teacher.parameters():
         param.requires_grad = False
+    print("Dataloaders, student and teacher ready.")
 
     dino_loss = DINOLoss(
         args.out_dim,
@@ -120,15 +121,14 @@ def main(args):
 
     # momentum parameter is increased to 1. during training with a cosine schedule
     momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
-    print(f"Loss, optimizer and schedulers ready.")
+    print("Loss, optimizer and schedulers ready.")
 
     # cifar10 trainset contains 50000 images
     n_batches = len(train_loader.dataset) // args.batch_size
     best_acc = 0
     n_steps = 0
 
-    for epoch in range(args.epochs):
-        print('Evaluating on validation set...')
+    for epoch in tqdm.auto.trange(args.epochs, desc=" epochs", position=0):
         student.eval()
 
         # TODO fix this: compute embeddings for tensorboard
@@ -173,7 +173,7 @@ def main(args):
             best_acc = current_acc
         teacher.train()
 
-        for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches):
+        for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1):
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):
                 param_group["lr"] = lr_schedule[it]
@@ -211,7 +211,8 @@ def main(args):
                     "lr": optim.param_groups[0]['lr'],
                     "weight_decay": optim.param_groups[0]['weight_decay'],
                 }, step=n_steps)
-            n_steps += 1
+
+        n_steps += 1
 
 
 if __name__ == '__main__':

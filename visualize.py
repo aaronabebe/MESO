@@ -42,7 +42,7 @@ def grad_cam(model, model_name, data):
     :return:
     """
     # use only one random image for now
-    random_choice = random.randint(0, len(data[0]))
+    random_choice = random.randint(0, len(data[0]) - 1)
 
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5))
     fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
@@ -93,7 +93,7 @@ def dino_attention(model, patch_size, data, plot=True):
     """
 
     # use only one random image for now
-    random_choice = random.randint(0, len(data[0]))
+    random_choice = random.randint(0, len(data[0]) - 1)
 
     # use only one image for now
     img = data[0][random_choice]
