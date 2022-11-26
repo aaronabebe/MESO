@@ -118,7 +118,9 @@ def dino_attention(model, patch_size, data, plot=True):
     attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
 
     fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
-    fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+    if len(data) > 1:
+        fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+
     for i in range(nh):
         ax = axs[i]
         ax.imshow(attentions[i].detach().numpy())
