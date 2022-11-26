@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+from torch.utils.data import RandomSampler
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
@@ -12,20 +13,20 @@ from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_
     MNIST_SIZE, MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN
 
 
-def get_dataloader(name: str, transforms: torchvision.transforms = None, train: bool = True,
+def get_dataloader(name: str, transforms: torchvision.transforms = None, train: bool = True, num_workers: int = 0,
                    **kwargs) -> torch.utils.data.DataLoader:
     """
     Returns the dataloader for a given dataset.
     :return:
     """
     if name == 'cifar10':
-        return _get_cifar10(train, transforms, **kwargs)
+        return _get_cifar10(train, transforms, num_workers, **kwargs)
     elif name == 'cifar10-c':
-        return _get_cifar10c(transforms, **kwargs)
+        return _get_cifar10c(transforms, num_workers, **kwargs)
     elif name == 'mnist':
-        return _get_mnist(train, transforms, **kwargs)
+        return _get_mnist(train, transforms, num_workers, **kwargs)
     elif name == 'fashion-mnist':
-        return _get_fashion_mnist(train, transforms, **kwargs)
+        return _get_fashion_mnist(train, transforms, num_workers, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
@@ -59,7 +60,7 @@ def default_transforms(input_size, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
     ])
 
 
-def _get_fashion_mnist(train: bool, transforms: torchvision.transforms,
+def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int,
                        **kwargs) -> torch.utils.data.DataLoader:
     trainset = torchvision.datasets.FashionMNIST(
         root=DEFAULT_DATA_DIR,
@@ -67,10 +68,10 @@ def _get_fashion_mnist(train: bool, transforms: torchvision.transforms,
         download=True,
         transform=transforms or default_fashion_mnist_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=os.cpu_count() // 2, **kwargs)
+    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
 
 
-def _get_mnist(train: bool, transforms: torchvision.transforms,
+def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int,
                **kwargs) -> torch.utils.data.DataLoader:
     trainset = torchvision.datasets.MNIST(
         root=DEFAULT_DATA_DIR,
@@ -78,20 +79,20 @@ def _get_mnist(train: bool, transforms: torchvision.transforms,
         download=True,
         transform=transforms or default_mnist_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=os.cpu_count() // 2, **kwargs)
+    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
 
 
-def _get_cifar10c(transforms: torchvision.transforms,
+def _get_cifar10c(transforms: torchvision.transforms, num_workers: int,
                   cname: str = random.choice(CIFAR_10_CORRUPTIONS), **kwargs):
     evalset = CIFAR10CDataset(
         './data/CIFAR-10-C',
         cname,
         tranform=transforms or default_cifar10_transforms()
     )
-    return torch.utils.data.DataLoader(evalset, shuffle=False, num_workers=os.cpu_count() // 2, **kwargs)
+    return torch.utils.data.DataLoader(evalset, shuffle=False, num_workers=num_workers, **kwargs)
 
 
-def _get_cifar10(train: bool, transforms: torchvision.transforms,
+def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: int,
                  **kwargs) -> torch.utils.data.DataLoader:
     trainset = torchvision.datasets.CIFAR10(
         root=DEFAULT_DATA_DIR,
@@ -99,7 +100,7 @@ def _get_cifar10(train: bool, transforms: torchvision.transforms,
         download=True,
         transform=transforms or default_cifar10_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=os.cpu_count() // 2, **kwargs)
+    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
 
 
 class DinoTransforms:

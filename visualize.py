@@ -10,9 +10,9 @@ from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch.nn import functional as F
 
-from data import get_dataloader, default_transforms, default_cifar10_transforms, DinoTransforms, get_mean_std
+from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std
 from models.models import get_eval_model
-from utils import grad_cam_reshape_transform, attention_viz_forward_wrapper, get_args, reshape_for_plot
+from utils import grad_cam_reshape_transform, get_args, reshape_for_plot
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
 CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -33,6 +33,7 @@ FASHION_MNIST_LABELS = (
 )
 
 
+@torch.no_grad()
 def grad_cam(model, model_name, data):
     """
     Visualize model reasoning via grad_cam library
@@ -86,6 +87,7 @@ def grad_cam(model, model_name, data):
     plt.show()
 
 
+@torch.no_grad()
 def dino_attention(model, patch_size, data, plot=True):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
@@ -136,6 +138,7 @@ def dino_attention(model, patch_size, data, plot=True):
     return img[0], attentions
 
 
+@torch.no_grad()
 def dino_augmentations(data):
     """
     Visualize the augmentations used in the DINO paper. Similarly to

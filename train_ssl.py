@@ -1,13 +1,10 @@
 import json
 import math
 import os
-import sys
 import pprint
+import sys
 
 import torch
-# enable if dataloaders run into "too many open files" error
-# torch.multiprocessing.set_sharing_strategy('file_system')
-
 import tqdm
 from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
@@ -16,13 +13,19 @@ from data import get_dataloader, DinoTransforms, get_mean_std, default_transform
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
 from models.models import get_model
-from test import compute_embeddings, compute_knn
-from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name
+from test import compute_knn
+from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds
 from visualize import dino_attention
+
+
+# enable if dataloaders run into "too many open files" error
+# torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 def main(args):
     pprint.pprint(vars(args))
+
+    fix_seeds(args.seed)
     device = torch.device(args.device)
 
     if args.wandb:
@@ -40,21 +43,32 @@ def main(args):
         std=std
     )
 
-    train_loader = get_dataloader(args.dataset, transforms=transforms, train=True,
-                                  batch_size=args.batch_size)
-    train_loader_plain = get_dataloader(args.dataset, train=True,
-                                        batch_size=args.batch_size)
-    val_loader_plain = get_dataloader(args.dataset, train=False,
-                                      batch_size=args.batch_size)
+    train_loader = get_dataloader(
+        args.dataset, transforms=transforms, train=True,
+        num_workers=args.num_workers,
+        batch_size=args.batch_size
+    )
+    train_loader_plain = get_dataloader(
+        args.dataset, train=True,
+        batch_size=args.batch_size
+    )
+    val_loader_plain = get_dataloader(
+        args.dataset, train=False,
+        batch_size=args.batch_size
+    )
 
     # sample one random batch for embedding visualization
     val_loader_plain_subset = get_dataloader(
         args.dataset,
         train=False,
         batch_size=1,
-        transforms=default_transforms(480) if args.input_channels == 3 else default_transforms(input_size, (0.5,), (0.5, )),  # using a larger input size for visualization
-        sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=args.batch_size)
+        transforms=default_transforms(224) if args.input_channels == 3 else default_transforms(args.input_size, (0.5,),
+                                                                                               (0.5,)),
+        # using a larger input size for visualization
+        sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=1)
     )
+    example_viz_img, _ = next(iter(val_loader_plain_subset))
+    example_viz_img = example_viz_img.to(device)
 
     os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/', exist_ok=True)
     experiment_name = get_experiment_name(args)
@@ -129,51 +143,52 @@ def main(args):
     n_steps = 0
 
     for epoch in tqdm.auto.trange(args.epochs, desc=" epochs", position=0):
-        student.eval()
+        if args.eval:
+            student.eval()
 
-        # TODO fix this: compute embeddings for tensorboard
-        # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
-        # writer.add_embedding(
-        #     embs,
-        #     metadata=labels,
-        #     label_img=imgs,
-        #     global_step=n_steps,
-        #     tag="embedding"
-        # )
+            # TODO fix this: compute embeddings for tensorboard
+            # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
+            # writer.add_embedding(
+            #     embs,
+            #     metadata=labels,
+            #     label_img=imgs,
+            #     global_step=n_steps,
+            #     tag="embedding"
+            # )
 
-        # knn eval
-        current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
-        writer.add_scalar('knn_acc', current_acc, n_steps)
-        if args.wandb:
-            wandb.log({'knn_acc': current_acc}, step=n_steps)
-
-        images, labels = next(iter(val_loader_plain_subset))
-        images, labels = images.to(device), labels.to(device)
-        orig, attentions = dino_attention(student.backbone, args.patch_size, (images, labels), plot=False)
-        if args.wandb:
-            wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
-            wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
-
-        if current_acc > best_acc:
-            save_dict = {
-                'student': student.state_dict(),
-                'teacher': teacher.state_dict(),
-                'optimizer': optim.state_dict(),
-                'epoch': epoch + 1,
-                'args': args,
-                'dino_loss': dino_loss.state_dict(),
-            }
-            save_path = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth'
-            torch.save(save_dict, save_path)
+            # knn eval
+            current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
+            writer.add_scalar('knn_acc', current_acc, n_steps)
             if args.wandb:
-                artifact = wandb.Artifact('model', type='model')
-                artifact.add_file(save_path)
-                wandb.log_artifact(artifact)
+                wandb.log({'knn_acc': current_acc}, step=n_steps)
 
-            best_acc = current_acc
-        teacher.train()
+            if args.visualize:
+                orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img, ), plot=False)
+                if args.wandb:
+                    wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
+                    wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
 
-        for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1):
+            if current_acc > best_acc:
+                save_dict = {
+                    'student': student.state_dict(),
+                    'teacher': teacher.state_dict(),
+                    'optimizer': optim.state_dict(),
+                    'epoch': epoch + 1,
+                    'args': args,
+                    'dino_loss': dino_loss.state_dict(),
+                }
+                save_path = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth'
+                torch.save(save_dict, save_path)
+                if args.wandb:
+                    artifact = wandb.Artifact('model', type='model')
+                    artifact.add_file(save_path)
+                    wandb.log_artifact(artifact)
+
+                best_acc = current_acc
+            student.train()
+
+        for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1,
+                                         leave=False):
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):
                 param_group["lr"] = lr_schedule[it]
@@ -211,8 +226,7 @@ def main(args):
                     "lr": optim.param_groups[0]['lr'],
                     "weight_decay": optim.param_groups[0]['weight_decay'],
                 }, step=n_steps)
-
-        n_steps += 1
+            n_steps += 1
 
 
 if __name__ == '__main__':

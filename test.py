@@ -23,6 +23,7 @@ def parse_args():
     return parser.parse_args()
 
 
+@torch.no_grad()
 def compute_embeddings(backbone, data_loader):
     device = next(backbone.parameters()).device
 
@@ -42,8 +43,8 @@ def compute_embeddings(backbone, data_loader):
     return embs, imgs, labels
 
 
+@torch.no_grad()
 def compute_knn(backbone, train_loader_plain, val_loader_plain):
-    return 0
     device = next(backbone.parameters()).device
 
     data_loaders = {
@@ -57,8 +58,8 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
         "y_val": [],
     }
 
-    for name, data_loader in tqdm(data_loaders.items(), position=3, desc=" evaluating knn"):
-        for imgs, y in tqdm(data_loader, position=4, desc=" eval batch"):
+    for name, data_loader in data_loaders.items():
+        for imgs, y in data_loader:
             imgs = imgs.to(device)
             lists[f"X_{name}"].append(backbone(imgs).detach().cpu().numpy())
             lists[f"y_{name}"].append(y.detach().cpu().numpy())

@@ -1,7 +1,9 @@
 import argparse
 import glob
 import os
+import random
 
+import numpy as np
 import torch
 
 TENSORBOARD_LOG_DIR = './tb_logs'
@@ -81,11 +83,23 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--warmup_steps", type=float, default=3, help="Warmup steps when using cosine LR scheduler.")
 
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
+    parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
+    parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
     parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
     parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
                         help="Visualize the loss landscape of the model.")
     return parser.parse_args()
+
+
+def fix_seeds(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def get_experiment_name(args):
@@ -136,32 +150,6 @@ def grad_cam_reshape_transform(tensor, height=4, width=4):
     # like in CNNs.
     result = result.transpose(2, 3).transpose(1, 2)
     return result
-
-
-def attention_viz_forward_wrapper(attn_obj):
-    """
-    Forward wrapper to visualize the attention maps using timm models.
-    :param attn_obj:
-    :return:
-    """
-
-    def forward_hook(x):
-        B, N, C = x.shape
-        qkv = attn_obj.qkv(x).reshape(B, N, 3, attn_obj.num_heads, C // attn_obj.num_heads).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv.unbind(0)  # make torchscript happy (cannot use tensor as tuple)
-
-        attn = (q @ k.transpose(-2, -1)) * attn_obj.scale
-        attn = attn.softmax(dim=-1)
-        attn = attn_obj.attn_drop(attn)
-        attn_obj.attn_map = attn
-        attn_obj.cls_attn_map = attn[:, :, 0, 1:]
-
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
-        x = attn_obj.proj(x)
-        x = attn_obj.proj_drop(x)
-        return x
-
-    return forward_hook
 
 
 def reshape_for_plot(img):
