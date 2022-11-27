@@ -88,7 +88,7 @@ def grad_cam(model, model_name, data):
 
 
 @torch.no_grad()
-def dino_attention(model, patch_size, data, plot=True):
+def dino_attention(model, patch_size, data, plot=True, path=None):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -118,6 +118,7 @@ def dino_attention(model, patch_size, data, plot=True):
     attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
 
     fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+
     if len(data) > 1:
         fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
 
@@ -130,12 +131,17 @@ def dino_attention(model, patch_size, data, plot=True):
     last.imshow(reshape_for_plot(img[0].cpu()))
 
     fig.tight_layout()
-    sub_dir_name = 'dino_attn'
-    os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
-    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_attention.svg")
+
+    if not path:
+        path = f"./plots/dino_attn"
+
+    os.makedirs(path, exist_ok=True)
+    fig.savefig(f"{path}/{time.ctime()}_attention.svg")
 
     if plot:
         plt.show()
+
+    plt.close()
 
     return img[0], attentions
 
@@ -176,7 +182,8 @@ def main(args):
             in_chans=args.input_channels,
             num_classes=0,
             patch_size=args.patch_size if 'vit' in args.model else None,
-            img_size=32
+            img_size=32,
+            load_remote=args.wandb
         )
         dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size, *get_mean_std(args.dataset)),
                             train=False,

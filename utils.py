@@ -86,6 +86,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
     parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model.')
+    parser.add_argument("--resume", action='store_true', default=False, help='Try to resume training from last checkpoint.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
     parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
                         help="Visualize the loss landscape of the model.")
@@ -103,7 +104,7 @@ def fix_seeds(seed):
 
 
 def get_experiment_name(args):
-    name = f'{args.model}_e{args.epochs}_b{args.batch_size}_o{args.optimizer}_lr{args.learning_rate:.4f}_wd{args.weight_decay:4f}'
+    name = f'{args.model}_{args.dataset}_e{args.epochs}_b{args.batch_size}_o{args.optimizer}'
     return name
 
 

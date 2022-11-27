@@ -3,14 +3,15 @@ from functools import partial
 import pytorch_lightning as pl
 import timm
 import torch
+import wandb
 from timm.models import register_model, ResNet, Bottleneck
 from torch import nn
 from torch.nn import functional as F
 from torchmetrics.functional import accuracy
 
-from utils import remove_prefix, get_latest_model_path
 from models.convnext import ConvNeXt
 from models.vision_transformer import VisionTransformer
+from utils import remove_prefix, get_latest_model_path
 
 
 def get_model(name: str, **kwargs) -> torch.nn.Module:
@@ -23,7 +24,8 @@ def get_model(name: str, **kwargs) -> torch.nn.Module:
         return timm.create_model(name, pretrained_cfg=None, **kwargs)
 
 
-def get_eval_model(name: str, device: torch.device, path_override=None, **kwargs) -> torch.nn.Module:
+def get_eval_model(name: str, device: torch.device, path_override=None, load_remote: bool = False,
+                   **kwargs) -> torch.nn.Module:
     """
     Returns a self trained model from the local model directory.
     :return:
@@ -31,9 +33,17 @@ def get_eval_model(name: str, device: torch.device, path_override=None, **kwargs
     model = get_model(name, **kwargs)
 
     if not path_override:
-        path_override = get_latest_model_path(name)
+        if load_remote:
+            wandb.init()
+            # TODO fix this naming
+            artifact = wandb.use_artifact('mcaaroni/dino/model:latest', type='model')
+            path_override = artifact.download()
+            path_override = f'{path_override}/best.pth'
+        else:
+            path_override = get_latest_model_path(name)
 
     ckpt = torch.load(path_override, map_location=device)
+
     model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'))
     model.eval()
     for p in model.parameters():

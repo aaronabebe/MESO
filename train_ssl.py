@@ -18,15 +18,17 @@ from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds
 from visualize import dino_attention
 
 
-# enable if dataloaders run into "too many open files" error
-# torch.multiprocessing.set_sharing_strategy('file_system')
-
-
 def main(args):
     pprint.pprint(vars(args))
 
     fix_seeds(args.seed)
     device = torch.device(args.device)
+
+    experiment_name = get_experiment_name(args)
+    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino', exist_ok=True)
+    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}'
+    writer = SummaryWriter(output_dir)
+    writer.add_text("args", json.dumps(vars(args)))
 
     if args.wandb:
         import wandb
@@ -69,11 +71,6 @@ def main(args):
     )
     example_viz_img, _ = next(iter(val_loader_plain_subset))
     example_viz_img = example_viz_img.to(device)
-
-    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/', exist_ok=True)
-    experiment_name = get_experiment_name(args)
-    writer = SummaryWriter(f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}')
-    writer.add_text("args", json.dumps(vars(args)))
 
     student = get_model(
         args.model,
@@ -140,9 +137,32 @@ def main(args):
     # cifar10 trainset contains 50000 images
     n_batches = len(train_loader.dataset) // args.batch_size
     best_acc = 0
-    n_steps = 0
+    start_epoch = 0
 
-    for epoch in tqdm.auto.trange(args.epochs, desc=" epochs", position=0):
+    if args.resume:
+        if args.wandb:
+            artifact = wandb.use_artifact('mcaaroni/dino/model:latest', type='model')
+            path = artifact.download()
+            path = f'{path}/best.pth'
+        else:
+            path = f'{output_dir}/best.pth'
+
+        if os.path.isfile(path):
+            print(f"=> loading checkpoint '{path}'")
+            checkpoint = torch.load(path, map_location=device)
+            student.load_state_dict(checkpoint['student'])
+            teacher.load_state_dict(checkpoint['teacher'])
+            optim.load_state_dict(checkpoint['optimizer'])
+            dino_loss.load_state_dict(checkpoint['dino_loss'])
+            # args = checkpoint['args']
+            start_epoch = checkpoint['epoch']
+            print(f"Resuming from epoch {start_epoch}")
+        else:
+            print(f"=> no checkpoint found at '{path}'")
+
+    n_steps = start_epoch * args.batch_size
+
+    for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
         if args.eval:
             student.eval()
 
@@ -163,7 +183,8 @@ def main(args):
                 wandb.log({'knn_acc': current_acc}, step=n_steps)
 
             if args.visualize:
-                orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img, ), plot=False)
+                orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img,), plot=False,
+                                                  path=output_dir)
                 if args.wandb:
                     wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
                     wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
@@ -177,10 +198,10 @@ def main(args):
                     'args': args,
                     'dino_loss': dino_loss.state_dict(),
                 }
-                save_path = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}/best.pth'
+                save_path = f'{output_dir}/best.pth'
                 torch.save(save_dict, save_path)
                 if args.wandb:
-                    artifact = wandb.Artifact('model', type='model')
+                    artifact = wandb.Artifact(f'{args.model}_{args.dataset}_model', type='model')
                     artifact.add_file(save_path)
                     wandb.log_artifact(artifact)
 

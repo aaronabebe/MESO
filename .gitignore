@@ -5,6 +5,7 @@ tb_logs/
 data/
 plots/
 wandb/
+artifacts/
 
 
 # Byte-compiled / optimized / DLL files
