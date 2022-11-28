@@ -141,7 +141,7 @@ def main(args):
 
     if args.resume:
         if args.wandb:
-            artifact = wandb.use_artifact('mcaaroni/dino/model:latest', type='model')
+            artifact = wandb.use_artifact(f'mcaaroni/dino/{args.model}_{args.dataset}_model:latest', type='model')
             path = artifact.download()
             path = f'{path}/best.pth'
         else:

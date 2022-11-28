@@ -78,7 +78,7 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
 def main(args: argparse.Namespace):
     device = torch.device(args.device)
 
-    model = get_eval_model(args.model, device=device)
+    model = get_eval_model(args.model, device, args.dataset)
     model.to(device)
 
     if args.corruption:

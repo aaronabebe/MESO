@@ -23,7 +23,7 @@ def main(args: argparse.Namespace):
     val_loader = get_dataloader(args.dataset, transforms=default_transforms, train=False, batch_size=args.batch_size)
 
     if args.eval:
-        net.model = get_eval_model(args.model, args.device, args.ckpt_path)
+        net.model = get_eval_model(args.model, args.device, args.dataset, args.ckpt_path)
         trainer.test(net, dataloaders=val_loader)
     else:
         trainer.fit(net, train_dataloaders=train_loader, val_dataloaders=val_loader)

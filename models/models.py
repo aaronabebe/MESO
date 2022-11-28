@@ -24,7 +24,7 @@ def get_model(name: str, **kwargs) -> torch.nn.Module:
         return timm.create_model(name, pretrained_cfg=None, **kwargs)
 
 
-def get_eval_model(name: str, device: torch.device, path_override=None, load_remote: bool = False,
+def get_eval_model(name: str, device: torch.device, dataset: str, path_override=None, load_remote: bool = False,
                    **kwargs) -> torch.nn.Module:
     """
     Returns a self trained model from the local model directory.
@@ -35,8 +35,7 @@ def get_eval_model(name: str, device: torch.device, path_override=None, load_rem
     if not path_override:
         if load_remote:
             wandb.init()
-            # TODO fix this naming
-            artifact = wandb.use_artifact('mcaaroni/dino/model:latest', type='model')
+            artifact = wandb.use_artifact(f'mcaaroni/dino/{name}_{dataset}_model:latest', type='model')
             path_override = artifact.download()
             path_override = f'{path_override}/best.pth'
         else:

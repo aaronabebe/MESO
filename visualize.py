@@ -178,6 +178,7 @@ def main(args):
         model = get_eval_model(
             args.model,
             args.device,
+            args.dataset,
             path_override=args.ckpt_path,
             in_chans=args.input_channels,
             num_classes=0,
@@ -201,6 +202,7 @@ def main(args):
         model = get_eval_model(
             args.model,
             args.device,
+            args.dataset,
             path_override=args.ckpt_path,
             in_chans=args.input_channels,
             num_classes=args.num_classes,

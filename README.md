@@ -17,8 +17,9 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [ ] cleanup experiment tracking (naming/saving models/saving plots/folder structure/timestamps)
 - [ ] improve logfiles
 
-- [ ] overfit on single batch
-- [ ] add continue from checkpoint
+- [x] overfit on single batch
+- [x] add continue from checkpoint
+- [ ] add wandb run resuming
 - [ ] add train scripts for finetuning self-supervised models
 - [x] add fixed seeds
 
