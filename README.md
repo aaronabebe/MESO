@@ -16,6 +16,8 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [ ] fix tensorboard embedding visualizations
 - [ ] cleanup experiment tracking (naming/saving models/saving plots/folder structure/timestamps)
 - [ ] improve logfiles
+- [ ] try out and add mobile-vit
+- [ ] try out guild ai
 
 - [x] overfit on single batch
 - [x] add continue from checkpoint

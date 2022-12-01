@@ -13,9 +13,9 @@ from data import get_dataloader, DinoTransforms, get_mean_std, default_transform
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
 from models.models import get_model
-from test import compute_knn
+from eval.knn import compute_knn
 from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds
-from visualize import dino_attention
+from visualize import dino_attention, grad_cam
 
 
 def main(args):
@@ -183,8 +183,12 @@ def main(args):
                 wandb.log({'knn_acc': current_acc}, step=n_steps)
 
             if args.visualize:
-                orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img,), plot=False,
-                                                  path=output_dir)
+                if 'vit' in args.model:
+                    orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img,), plot=False,
+                                                      path=output_dir)
+                else:
+                    orig, attentions = grad_cam(student.backbone, args.model, (example_viz_img,), plot=False,
+                                                path=output_dir)
                 if args.wandb:
                     wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
                     wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)

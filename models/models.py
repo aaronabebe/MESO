@@ -43,6 +43,7 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
 
     ckpt = torch.load(path_override, map_location=device)
 
+    # TODO fix for gradcam viz
     model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'))
     model.eval()
     for p in model.parameters():
@@ -70,6 +71,11 @@ def vit_tiny(pretrained=False, patch_size=4, **kwargs):
 @register_model
 def convnext_tiny(pretrained=False, pretrained_cfg=None, **kwargs):
     return ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
+
+
+@register_model
+def convnext_pico(pretrained=False, pretrained_cfg=None, **kwargs):
+    return ConvNeXt(depths=[2, 2, 6, 2], dims=[64, 128, 256, 512], **kwargs)
 
 
 @register_model

@@ -33,58 +33,71 @@ FASHION_MNIST_LABELS = (
 )
 
 
-@torch.no_grad()
-def grad_cam(model, model_name, data):
+def grad_cam(model, model_name, data, plot=True, path=None):
     """
     Visualize model reasoning via grad_cam library
-    :param model:
-    :param data:
-    :param model_name:
-    :return:
     """
     # use only one random image for now
+    device = next(model.parameters()).device
+    model.fc, model.head = torch.nn.Identity(), torch.nn.Identity()
+
     random_choice = random.randint(0, len(data[0]) - 1)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 5))
-    fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+
+    classifier_target = None
+    if len(data) > 1:
+        fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
+        classifier_target = [ClassifierOutputTarget(data[1][random_choice])]
+
     fig.tight_layout()
 
     if 'vit' in model_name:
         target_layer = [model.blocks[-1].norm1]
+    elif 'convnext' in model_name:
+        target_layer = [model.stages[-1][-1]]
     else:
         target_layer = [model.layer4[-1]]
 
     input_tensor = data[0][random_choice:random_choice + 1]
 
     y = model(input_tensor)
-    preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
+    # preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
 
+    # TODO fix grad cam viz
     cam = GradCAM(
         model=model,
         target_layers=target_layer,
-        use_cuda=torch.cuda.is_available(),
+        use_cuda=device == 'cuda',
         reshape_transform=grad_cam_reshape_transform if 'vit' in model_name else None,
     )
-    grayscale_cam = cam(input_tensor=input_tensor, targets=[ClassifierOutputTarget(data[1][random_choice])])
-    input_tensor = np.transpose(input_tensor.numpy()[0], (1, 2, 0))
+    grayscale_cam = cam(input_tensor=input_tensor, targets=classifier_target)
+    input_tensor = np.transpose(input_tensor.cpu().numpy()[0], (1, 2, 0))
     ax1.imshow(input_tensor)
 
     visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True)
     ax2.imshow(visualization)
 
-    ax3.axis('off')
-    ax3.axis('tight')
-    ax3.table(
-        [[p] for p in preds],
-        colLabels=[f'Top {len(preds)} predictions'],
-        loc='center',
-    )
+    # ax3.axis('off')
+    # ax3.axis('tight')
+    # ax3.table(
+    #     [[p] for p in preds],
+    #     colLabels=[f'Top {} predictions'],
+    #     loc='center',
+    # )
 
-    sub_dir_name = 'grad_cam'
-    os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
-    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_grad_cam.svg")
+    if not path:
+        path = f"./plots/grad_cam"
 
-    plt.show()
+    os.makedirs(path, exist_ok=True)
+    fig.savefig(f"{path}/{time.ctime()}_grads.svg")
+
+    if plot:
+        plt.show()
+
+    plt.close()
+
+    return input_tensor, [visualization]
 
 
 @torch.no_grad()
@@ -207,7 +220,8 @@ def main(args):
             in_chans=args.input_channels,
             num_classes=args.num_classes,
             patch_size=args.patch_size if 'vit' in args.model else None,
-            img_size=args.input_size
+            img_size=args.input_size if 'vit' in args.model else None,
+            load_remote=args.wandb
         )
         dl = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
