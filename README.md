@@ -22,6 +22,7 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [x] overfit on single batch
 - [x] add continue from checkpoint
 - [ ] add wandb run resuming
+- [ ] parallelize knn evaluation
 - [ ] add train scripts for finetuning self-supervised models
 - [x] add fixed seeds
 
@@ -40,7 +41,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Running
+## Examples
 
 Train self-supervised ViT model:
 
@@ -53,6 +54,12 @@ Train self-supervised ResNet model:
 ```shell
 python train_ssl.py --device cuda --model resnet26_dino_cifar10 --optimizer adamw --epochs 100 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --in_dim 2048
 
+```
+
+Train self-supervised ConvNeXt on fashion-mnist:
+
+```shell
+python train_ssl.py --device cpu --model convnext_tiny --optimizer adamw --epochs 100 --batch_size 32 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --warmup_epochs 15 --dataset fashion-mnist --input_channels 1 --in_dim 768
 ```
 
 Visualize DINO attention maps:

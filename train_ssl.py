@@ -64,8 +64,7 @@ def main(args):
         args.dataset,
         train=False,
         batch_size=1,
-        transforms=default_transforms(224) if args.input_channels == 3 else default_transforms(args.input_size, (0.5,),
-                                                                                               (0.5,)),
+        transforms=default_transforms(224),
         # using a larger input size for visualization
         sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=1)
     )
@@ -76,20 +75,23 @@ def main(args):
         args.model,
         in_chans=args.input_channels,
         num_classes=args.num_classes,
-        patch_size=args.patch_size if 'vit' in args.model else None,
-        img_size=args.input_size if 'vit' in args.model else None
+        patch_size=args.patch_size if 'vit_' in args.model else None,
+        img_size=args.input_size if 'vit_' in args.model else None
     )
-    student = MultiCropWrapper(student, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
+
+    embed_dim = student.embed_dim if 'vit_' in args.model else args.in_dim
+
+    student = MultiCropWrapper(student, MLPHead(in_dim=embed_dim, out_dim=args.out_dim))
     student = student.to(device)
 
     teacher = get_model(
         args.model,
         in_chans=args.input_channels,
         num_classes=args.num_classes,
-        patch_size=args.patch_size if 'vit' in args.model else None,
-        img_size=args.input_size if 'vit' in args.model else None
+        patch_size=args.patch_size if 'vit_' in args.model else None,
+        img_size=args.input_size if 'vit_' in args.model else None
     )
-    teacher = MultiCropWrapper(teacher, MLPHead(in_dim=args.in_dim, out_dim=args.out_dim))
+    teacher = MultiCropWrapper(teacher, MLPHead(in_dim=embed_dim, out_dim=args.out_dim))
     teacher = teacher.to(device)
 
     # teacher gets student weights and doesnt learn

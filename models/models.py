@@ -43,11 +43,8 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
 
     ckpt = torch.load(path_override, map_location=device)
 
-    # TODO fix for gradcam viz
-    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'))
+    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
     model.eval()
-    for p in model.parameters():
-        p.requires_grad = False
     return model
 
 

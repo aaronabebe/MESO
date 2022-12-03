@@ -52,12 +52,11 @@ def default_fashion_mnist_transforms():
     return default_transforms(MNIST_SIZE, *get_mean_std('fashion-mnist'))
 
 
-def default_transforms(input_size, mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)):
-    return transforms.Compose([
-        transforms.Resize(input_size),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=mean, std=std)
-    ])
+def default_transforms(input_size, mean=None, std=None):
+    t = [transforms.Resize(input_size), transforms.ToTensor()]
+    if mean or std:
+        t.append(transforms.Normalize(mean=mean, std=std))
+    return transforms.Compose(t)
 
 
 def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int,

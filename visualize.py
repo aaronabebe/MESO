@@ -39,7 +39,6 @@ def grad_cam(model, model_name, data, plot=True, path=None):
     """
     # use only one random image for now
     device = next(model.parameters()).device
-    model.fc, model.head = torch.nn.Identity(), torch.nn.Identity()
 
     random_choice = random.randint(0, len(data[0]) - 1)
 
@@ -61,10 +60,6 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
     input_tensor = data[0][random_choice:random_choice + 1]
 
-    y = model(input_tensor)
-    # preds = [f'{CIFAR10_LABELS[i]} ({y[0][i]})' for i in y[0].argsort(descending=True)]
-
-    # TODO fix grad cam viz
     cam = GradCAM(
         model=model,
         target_layers=target_layer,
@@ -77,14 +72,6 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
     visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True)
     ax2.imshow(visualization)
-
-    # ax3.axis('off')
-    # ax3.axis('tight')
-    # ax3.table(
-    #     [[p] for p in preds],
-    #     colLabels=[f'Top {} predictions'],
-    #     loc='center',
-    # )
 
     if not path:
         path = f"./plots/grad_cam"
@@ -101,7 +88,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
 
 @torch.no_grad()
-def dino_attention(model, patch_size, data, plot=True, path=None):
+def dino_attention(models: list[torch.nn.Module], patch_size, data, plot=True, path=None):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -121,42 +108,45 @@ def dino_attention(model, patch_size, data, plot=True, path=None):
     w_featmap = img.shape[-2] // patch_size
     h_featmap = img.shape[-1] // patch_size
 
-    attentions = model.get_last_selfattention(img)
+    all_attentions = []
+    for i, model in enumerate(models):
+        all_attentions.append(model.get_last_selfattention(img))
+        attentions = all_attentions[i]
 
-    nh = attentions.shape[1]  # number of head
+        nh = attentions.shape[1]  # number of head
 
-    # we keep only the output patch attention
-    attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
-    attentions = attentions.reshape(nh, w_featmap, h_featmap)
-    attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
+        # we keep only the output patch attention
+        attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
+        attentions = attentions.reshape(nh, w_featmap, h_featmap)
+        attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
 
-    fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+        fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
 
-    if len(data) > 1:
-        fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+        if len(data) > 1:
+            fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
 
-    for i in range(nh):
-        ax = axs[i]
-        ax.imshow(attentions[i].detach().numpy())
-        ax.axis("off")
+        for i in range(nh):
+            ax = axs[i]
+            ax.imshow(attentions[i].detach().numpy())
+            ax.axis("off")
 
-    last = axs[-1]
-    last.imshow(reshape_for_plot(img[0].cpu()))
+        last = axs[-1]
+        last.imshow(reshape_for_plot(img[0].cpu()))
 
-    fig.tight_layout()
+        fig.tight_layout()
 
-    if not path:
-        path = f"./plots/dino_attn"
+        if not path:
+            path = f"./plots/dino_attn"
 
-    os.makedirs(path, exist_ok=True)
-    fig.savefig(f"{path}/{time.ctime()}_attention.svg")
+        os.makedirs(path, exist_ok=True)
+        fig.savefig(f"{path}/{time.ctime()}_attention.svg")
 
-    if plot:
-        plt.show()
+        if plot:
+            plt.show()
 
     plt.close()
 
-    return img[0], attentions
+    return img[0], all_attentions[0]
 
 
 @torch.no_grad()
@@ -188,6 +178,7 @@ def main(args):
     print(f'Visualizing {args.visualize} for {args.model} model...')
 
     if args.visualize == 'dino_attn':
+        models = []
         model = get_eval_model(
             args.model,
             args.device,
@@ -199,11 +190,30 @@ def main(args):
             img_size=32,
             load_remote=args.wandb
         )
-        dl = get_dataloader(args.dataset, transforms=default_transforms(args.input_size, *get_mean_std(args.dataset)),
-                            train=False,
-                            batch_size=args.batch_size)
+        models.append(model)
+        if args.compare:
+            model2 = get_eval_model(
+                args.model,
+                args.device,
+                args.dataset,
+                path_override=args.compare,
+                in_chans=args.input_channels,
+                num_classes=0,
+                patch_size=args.patch_size if 'vit' in args.model else None,
+                img_size=32,
+                load_remote=False
+            )
+            models.append(model2)
+
+        dl = get_dataloader(
+            args.dataset,
+            transforms=default_transforms(args.input_size),
+            train=False,
+            batch_size=args.batch_size
+        )
         data = next(iter(dl))
-        dino_attention(model, args.patch_size, data)
+        dino_attention(models, args.patch_size, data)
+
     elif args.visualize == 'dino_augs':
         mean, std = get_mean_std(args.dataset)
         dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
@@ -211,6 +221,7 @@ def main(args):
         dl = get_dataloader(args.dataset, transforms=dino_transforms, train=False, batch_size=args.batch_size)
         data = next(iter(dl))
         dino_augmentations(data)
+
     elif args.visualize == 'grad_cam':
         model = get_eval_model(
             args.model,
@@ -223,7 +234,11 @@ def main(args):
             img_size=args.input_size if 'vit' in args.model else None,
             load_remote=args.wandb
         )
-        dl = get_dataloader(args.dataset, train=False, batch_size=args.batch_size)
+        dl = get_dataloader(
+            args.dataset,
+            transforms=default_transforms(args.input_size),
+            train=False, batch_size=args.batch_size
+        )
         data = next(iter(dl))
         grad_cam(model, args.model, data)
     else:

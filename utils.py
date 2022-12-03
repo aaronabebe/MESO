@@ -35,6 +35,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
     parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
+    parser.add_argument("--compare", type=str, help="Compare visualizations of model with this model.")
 
     parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
     parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
