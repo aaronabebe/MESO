@@ -26,13 +26,33 @@ CIFAR_10_CORRUPTIONS = (
     'spatter', 'speckle_noise', 'zoom_blur'
 )
 
+# https://www.cs.toronto.edu/~kriz/cifar.html
+CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+CIFAR100_LABELS = (
+    'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy',
+    'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
+    'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
+    'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion', 'lizard',
+    'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid',
+    'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum',
+    'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper',
+    'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
+    'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf',
+    'woman', 'worm'
+)
+FASHION_MNIST_LABELS = (
+    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
+)
+
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Run training for different ML experiments')
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
-    parser.add_argument("--subset", type=int, default=-1, help="Subset of dataset for testing.")
+    parser.add_argument("--train_subset", type=int, default=-1, help="Subset of dataset for training.")
+    parser.add_argument("--test_subset", type=int, default=2000,
+                        help="Subset of dataset for faster testing and evaluation (Default 2000)")
     parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
     parser.add_argument("--compare", type=str, help="Compare visualizations of model with this model.")
@@ -89,7 +109,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--resume", action='store_true', default=False,
                         help='Try to resume training from last checkpoint.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
-    parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
+    parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam', 'tsne'],
                         help="Visualize the model during the training.")
     return parser.parse_args()
 
@@ -165,3 +185,24 @@ def grad_cam_reshape_transform(tensor, height=4, width=4):
 
 def reshape_for_plot(img):
     return img.permute(1, 2, 0) * 0.5 + 0.5
+
+
+@torch.no_grad()
+def compute_embeddings(backbone, data_loader):
+    device = next(backbone.parameters()).device
+
+    embs_l = []
+    imgs_l = []
+    labels = []
+
+    for img, y in data_loader:
+        img = img.to(device)
+        embs_l.append(backbone(img).detach().cpu())
+        imgs_l.append(((img * CIFAR10_STD[1]) + CIFAR10_MEAN[1]).cpu())  # undo norm
+        # labels.extend([CIFAR10_LABELS[i] for i in y.tolist()])
+        labels.extend(y.tolist())
+
+    embs = torch.cat(embs_l, dim=0)
+    imgs = torch.cat(imgs_l, dim=0)
+
+    return embs, imgs, labels

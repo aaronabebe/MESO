@@ -25,8 +25,8 @@ def main(args):
     device = torch.device(args.device)
 
     experiment_name = get_experiment_name(args)
-    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()}', exist_ok=True)
-    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()}/{experiment_name}'
+    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()[:10]}', exist_ok=True)
+    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()[:10]}/{experiment_name}'
     writer = SummaryWriter(output_dir)
     writer.add_text("args", json.dumps(vars(args)))
 
@@ -49,17 +49,17 @@ def main(args):
         args.dataset, transforms=transforms, train=True,
         num_workers=args.num_workers,
         batch_size=args.batch_size,
-        subset=args.subset
+        subset=args.train_subset
     )
     train_loader_plain = get_dataloader(
         args.dataset, train=True,
         batch_size=args.batch_size,
-        subset=args.subset
+        subset=args.test_subset
     )
     val_loader_plain = get_dataloader(
         args.dataset, train=False,
         batch_size=args.batch_size,
-        subset=args.subset
+        subset=args.test_subset
     )
 
     # sample one random batch for embedding visualization
@@ -69,8 +69,9 @@ def main(args):
         batch_size=1,
         transforms=default_transforms(224),
         # using a larger input size for visualization
-        subset=args.subset
+        subset=1
     )
+
     example_viz_img, _ = next(iter(val_loader_plain_subset))
     example_viz_img = example_viz_img.to(device)
 

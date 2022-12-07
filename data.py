@@ -13,8 +13,8 @@ from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_
     MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN
 
 
-def get_dataloader(name: str, transforms: torchvision.transforms = None, train: bool = True, num_workers: int = 0,
-                   subset: int = 0, **kwargs) -> torch.utils.data.DataLoader:
+def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = None, train: bool = True,
+                   num_workers: int = 0, **kwargs) -> torch.utils.data.DataLoader:
     """
     Returns the dataloader for a given dataset.
     :return:

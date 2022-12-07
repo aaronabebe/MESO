@@ -9,28 +9,11 @@ from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from torch.nn import functional as F
+from sklearn.manifold import TSNE
 
 from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std
 from models.models import get_eval_model
-from utils import grad_cam_reshape_transform, get_args, reshape_for_plot
-
-# https://www.cs.toronto.edu/~kriz/cifar.html
-CIFAR10_LABELS = ('airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-CIFAR100_LABELS = (
-    'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 'bicycle', 'bottle', 'bowl', 'boy',
-    'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock',
-    'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest',
-    'fox', 'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion', 'lizard',
-    'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse', 'mushroom', 'oak_tree', 'orange', 'orchid',
-    'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine', 'possum',
-    'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper',
-    'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
-    'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf',
-    'woman', 'worm'
-)
-FASHION_MNIST_LABELS = (
-    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
-)
+from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings
 
 
 def grad_cam(model, model_name, data, plot=True, path=None):
@@ -85,6 +68,28 @@ def grad_cam(model, model_name, data, plot=True, path=None):
     plt.close()
 
     return input_tensor, [visualization]
+
+
+@torch.no_grad()
+def t_sne(model, data_loader, plot=True, path=None):
+    """
+    Visualize model reasoning via t-SNE
+    """
+    embs, imgs, labels = compute_embeddings(model, data_loader)
+    tsne = TSNE(n_components=2, random_state=123, verbose=1)
+    z = tsne.fit_transform(embs)
+    plt.scatter(z[:, 0], z[:, 1], c=labels, cmap='tab10', alpha=0.3)
+
+    if not path:
+        path = f"./plots/tsne"
+
+    os.makedirs(path, exist_ok=True)
+    plt.savefig(f"{path}/{time.ctime()}_tsne.svg")
+
+    if plot:
+        plt.show()
+
+    plt.close()
 
 
 @torch.no_grad()
@@ -209,6 +214,7 @@ def main(args):
             args.dataset,
             transforms=default_transforms(args.input_size),
             train=False,
+            subset=1,
             batch_size=args.batch_size
         )
         data = next(iter(dl))
@@ -218,7 +224,13 @@ def main(args):
         mean, std = get_mean_std(args.dataset)
         dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
                                          args.global_crops_scale, mean=mean, std=std)
-        dl = get_dataloader(args.dataset, transforms=dino_transforms, train=False, batch_size=args.batch_size)
+        dl = get_dataloader(
+            args.dataset,
+            transforms=dino_transforms,
+            subset=1,
+            train=False,
+            batch_size=args.batch_size
+        )
         data = next(iter(dl))
         dino_augmentations(data)
 
@@ -230,17 +242,37 @@ def main(args):
             path_override=args.ckpt_path,
             in_chans=args.input_channels,
             num_classes=args.num_classes,
-            patch_size=args.patch_size if 'vit' in args.model else None,
-            img_size=args.input_size if 'vit' in args.model else None,
+            patch_size=args.patch_size if 'vit_' in args.model else None,
+            img_size=args.input_size if 'vit_' in args.model else None,
             load_remote=args.wandb
         )
         dl = get_dataloader(
             args.dataset,
             transforms=default_transforms(args.input_size),
+            subset=1,
             train=False, batch_size=args.batch_size
         )
         data = next(iter(dl))
         grad_cam(model, args.model, data)
+    elif args.visualize == 'tsne':
+        model = get_eval_model(
+            args.model,
+            args.device,
+            args.dataset,
+            path_override=args.ckpt_path,
+            in_chans=args.input_channels,
+            num_classes=args.num_classes,
+            patch_size=args.patch_size if 'vit_' in args.model else None,
+            img_size=args.input_size if 'vit_' in args.model else None,
+            load_remote=args.wandb
+        )
+        dl = get_dataloader(
+            args.dataset,
+            transforms=default_transforms(args.input_size),
+            subset=2000,
+            train=False, batch_size=args.batch_size
+        )
+        t_sne(model, dl)
     else:
         raise NotImplementedError(f'Visualization {args.visualize} not implemented.')
 

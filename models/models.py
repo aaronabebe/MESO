@@ -87,7 +87,7 @@ def vit_tiny_dino_cifar10(pretrained=False, **kwargs):
 
 @register_model
 def dino_b_cifar100(pretrained=False, **kwargs):
-    return VisionTransformer(img_size=224, patch_size=16, embed_dim=768, num_heads=12, depth=12, num_classes=100,
+    return VisionTransformer(img_size=224, patch_size=16, embed_dim=768, num_heads=12, depth=12,
                              **kwargs)
 
 
