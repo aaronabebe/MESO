@@ -59,7 +59,8 @@ python train_ssl.py --device cuda --model resnet26_dino_cifar10 --optimizer adam
 Train self-supervised ConvNeXt on fashion-mnist:
 
 ```shell
-python train_ssl.py --device cpu --model convnext_tiny --optimizer adamw --epochs 100 --batch_size 32 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --warmup_epochs 15 --dataset fashion-mnist --input_channels 1 --in_dim 768
+python train_ssl.py --device cpu --model convnext_tiny --optimizer adamw --epochs 100 --batch_size 128 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --warmup_epochs 15 --dataset fashion-mnist --input_channels 1 --in_dim 768
+python train_ssl.py --device cuda --model convnext_pico --optimizer adamw --epochs 200 --batch_size 128 --learning_rate 0.03 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --weight_decay 1e-4 --weight_decay_end 1e-4 --dataset fashion-mnist --input_channels 1 --input_size 32 --in_dim 512
 ```
 
 Visualize DINO attention maps:

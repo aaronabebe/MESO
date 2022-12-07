@@ -16,7 +16,6 @@ CIFAR10_SIZE = 32
 
 MNIST_MEAN = (0.1307,)
 MNIST_STD = (0.3081,)
-MNIST_SIZE = 28
 
 FASHION_MNIST_MEAN = (0.2860,)
 FASHION_MNIST_STD = (0.3530,)
@@ -33,21 +32,22 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
+    parser.add_argument("--subset", type=int, default=-1, help="Subset of dataset for testing.")
     parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
     parser.add_argument("--compare", type=str, help="Compare visualizations of model with this model.")
 
     parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
     parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
-    parser.add_argument("--num_classes", type=int, default=10, help="Number of classes in the dataset.")
+    parser.add_argument("--num_classes", type=int, default=0, help="Number of classes in the dataset. (Defaults to 0)")
     parser.add_argument("--patch_size", type=int, default=4, help="Patch size for ViT.")
 
     parser.add_argument("--in_dim", type=int, default=192, help="Size of DINO MLPHead hidden layer input dims")
     parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
-    parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.4),
+    parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.5),
                         help="Scale of local crops for DINO augmentation.")
-    parser.add_argument("--global_crops_scale", type=float, nargs='+', default=(0.5, 1.),
+    parser.add_argument("--global_crops_scale", type=float, nargs='+', default=(0.7, 1.),
                         help="Scale of global crops for DINO augmentation.")
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
                         help="""Initial value for the teacher temperature: 0.04 works well in most cases.
@@ -62,12 +62,12 @@ def get_args() -> argparse.Namespace:
             of the teacher temperature. For most experiments, anything above 0.07 is unstable. We recommend
             starting with the default value of 0.04 and increase this slightly if needed.""")
     parser.add_argument("--momentum_teacher", type=float, default=0.9995, help="Momentum for the DINO teacher model.")
-    parser.add_argument('--warmup_teacher_temp_epochs', default=0, type=int,
+    parser.add_argument('--warmup_teacher_temp_epochs', default=10, type=int,
                         help='Number of warmup epochs for the teacher temperature (Default: 10).')
-    parser.add_argument("--warmup_epochs", default=5, type=int,
+    parser.add_argument("--warmup_epochs", default=10, type=int,
                         help="Number of epochs for the linear learning-rate warm up.")
 
-    parser.add_argument("--optimizer", type=str, default='sgd', choices=['sgd', 'adam', 'adamw'],
+    parser.add_argument("--optimizer", type=str, default='adamw', choices=['sgd', 'adam', 'adamw'],
                         help="Optimizer to use.")
     parser.add_argument("--sam", action='store_true', default=False,
                         help='Use SAM in conjunction with standard chosen optimizer.')
@@ -75,7 +75,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--min_lr', type=float, default=1e-6, help="""Target LR at the
         end of optimization. We use a cosine LR schedule with linear warmup.""")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum when training with SGD as optimizer.")
-    parser.add_argument("--scheduler", type=str, default=None, help="Learning rate decay for optimizer")
     parser.add_argument("--weight_decay", type=float, default=0.04, help="Weight decay for optimizer")
     parser.add_argument('--weight_decay_end', type=float, default=0.4, help="""Final value of the
         weight decay. We use a cosine schedule for WD and using a larger decay by
@@ -86,12 +85,12 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
-    parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model.')
+    parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model during training.')
     parser.add_argument("--resume", action='store_true', default=False,
                         help='Try to resume training from last checkpoint.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
     parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam'],
-                        help="Visualize the loss landscape of the model.")
+                        help="Visualize the model during the training.")
     return parser.parse_args()
 
 
@@ -144,6 +143,15 @@ def eval_accuracy(output, target, topk=(1, 5)):
             return acc[0]
         else:
             return acc
+
+
+def get_model_embed_dim(model, arch_name):
+    if 'vit_' in arch_name:
+        return model.embed_dim
+    elif 'mobilevit' in arch_name:
+        return model.num_features
+    else:
+        return model.head.in_features
 
 
 def grad_cam_reshape_transform(tensor, height=4, width=4):

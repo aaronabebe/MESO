@@ -10,23 +10,23 @@ from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
-    MNIST_SIZE, MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN
+    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN
 
 
 def get_dataloader(name: str, transforms: torchvision.transforms = None, train: bool = True, num_workers: int = 0,
-                   **kwargs) -> torch.utils.data.DataLoader:
+                   subset: int = 0, **kwargs) -> torch.utils.data.DataLoader:
     """
     Returns the dataloader for a given dataset.
     :return:
     """
     if name == 'cifar10':
-        return _get_cifar10(train, transforms, num_workers, **kwargs)
+        return _get_cifar10(train, transforms, num_workers, subset, **kwargs)
     elif name == 'cifar10-c':
-        return _get_cifar10c(transforms, num_workers, **kwargs)
+        return _get_cifar10c(transforms, num_workers, subset, **kwargs)
     elif name == 'mnist':
-        return _get_mnist(train, transforms, num_workers, **kwargs)
+        return _get_mnist(train, transforms, num_workers, subset, **kwargs)
     elif name == 'fashion-mnist':
-        return _get_fashion_mnist(train, transforms, num_workers, **kwargs)
+        return _get_fashion_mnist(train, transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
@@ -45,11 +45,11 @@ def default_cifar10_transforms():
 
 
 def default_mnist_transforms():
-    return default_transforms(MNIST_SIZE, *get_mean_std('mnist'))
+    return default_transforms(CIFAR10_SIZE, *get_mean_std('mnist'))
 
 
 def default_fashion_mnist_transforms():
-    return default_transforms(MNIST_SIZE, *get_mean_std('fashion-mnist'))
+    return default_transforms(CIFAR10_SIZE, *get_mean_std('fashion-mnist'))
 
 
 def default_transforms(input_size, mean=None, std=None):
@@ -59,47 +59,73 @@ def default_transforms(input_size, mean=None, std=None):
     return transforms.Compose(t)
 
 
-def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int,
+def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                        **kwargs) -> torch.utils.data.DataLoader:
+    shuffle = True
+    sampler = None
     trainset = torchvision.datasets.FashionMNIST(
         root=DEFAULT_DATA_DIR,
         train=train,
         download=True,
         transform=transforms or default_fashion_mnist_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
+    if subset > 0:
+        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
+        shuffle = False
+    return torch.utils.data.DataLoader(
+        trainset, shuffle=shuffle, sampler=sampler, num_workers=num_workers, **kwargs
+    )
 
 
-def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int,
+def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                **kwargs) -> torch.utils.data.DataLoader:
+    shuffle = True
+    sampler = None
     trainset = torchvision.datasets.MNIST(
         root=DEFAULT_DATA_DIR,
         train=train,
         download=True,
         transform=transforms or default_mnist_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
+    if subset > 0:
+        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
+        shuffle = False
+    return torch.utils.data.DataLoader(
+        trainset, shuffle=shuffle, sampler=sampler, num_workers=num_workers, **kwargs
+    )
 
 
-def _get_cifar10c(transforms: torchvision.transforms, num_workers: int,
+def _get_cifar10c(transforms: torchvision.transforms, num_workers: int, subset: int,
                   cname: str = random.choice(CIFAR_10_CORRUPTIONS), **kwargs):
+    sampler = None
     evalset = CIFAR10CDataset(
         './data/CIFAR-10-C',
         cname,
         tranform=transforms or default_cifar10_transforms()
     )
-    return torch.utils.data.DataLoader(evalset, shuffle=False, num_workers=num_workers, **kwargs)
+    if subset > 0:
+        sampler = RandomSampler(evalset, replacement=True, num_samples=subset)
+    return torch.utils.data.DataLoader(
+        evalset, shuffle=False, sampler=sampler, num_workers=num_workers, **kwargs
+    )
 
 
-def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: int,
+def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                  **kwargs) -> torch.utils.data.DataLoader:
+    shuffle = True
+    sampler = None
     trainset = torchvision.datasets.CIFAR10(
         root=DEFAULT_DATA_DIR,
         train=train,
         download=True,
         transform=transforms or default_cifar10_transforms(),
     )
-    return torch.utils.data.DataLoader(trainset, shuffle=train, num_workers=num_workers, **kwargs)
+    if subset > 0:
+        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
+        shuffle = False
+    return torch.utils.data.DataLoader(
+        trainset, shuffle=shuffle, num_workers=num_workers, sampler=sampler, **kwargs
+    )
 
 
 class DinoTransforms:
@@ -141,8 +167,7 @@ class DinoTransforms:
         ])
 
         self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(input_size, scale=local_crops_scale,
-                                         # todo: should actually be input_size // 2
+            transforms.RandomResizedCrop(input_size // 2, scale=local_crops_scale,
                                          interpolation=InterpolationMode.BICUBIC),
             flip_and_color_jitter,
             RandomGaussianBlur(p=0.5),

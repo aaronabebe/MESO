@@ -19,7 +19,15 @@ class MultiCropWrapper(nn.Module):
     def __init__(self, backbone, mlphead):
         super(MultiCropWrapper, self).__init__()
         # disable layers dedicated to ImageNet labels classification
-        backbone.fc, backbone.head = nn.Identity(), nn.Identity()
+        if hasattr(backbone, "fc") and type(backbone.fc) != nn.Identity:
+            backbone.fc = nn.Identity()
+
+        if hasattr(backbone, "head") and type(backbone.head) != nn.Identity:
+            if hasattr(backbone.head, "fc"):
+                backbone.head.fc = nn.Identity()
+            else:
+                backbone.head = nn.Identity()
+
         self.backbone = backbone
         self.mlphead = mlphead
 

@@ -51,9 +51,9 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
     fig.tight_layout()
 
-    if 'vit' in model_name:
+    if 'vit_' in model_name:
         target_layer = [model.blocks[-1].norm1]
-    elif 'convnext' in model_name:
+    elif 'convnext' in model_name or 'mobilevit' in model_name:
         target_layer = [model.stages[-1][-1]]
     else:
         target_layer = [model.layer4[-1]]
@@ -64,7 +64,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
         model=model,
         target_layers=target_layer,
         use_cuda=device == 'cuda',
-        reshape_transform=grad_cam_reshape_transform if 'vit' in model_name else None,
+        reshape_transform=grad_cam_reshape_transform if 'vit_' in model_name else None,
     )
     grayscale_cam = cam(input_tensor=input_tensor, targets=classifier_target)
     input_tensor = np.transpose(input_tensor.cpu().numpy()[0], (1, 2, 0))

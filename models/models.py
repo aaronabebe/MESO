@@ -91,32 +91,6 @@ def dino_b_cifar100(pretrained=False, **kwargs):
                              **kwargs)
 
 
-@register_model
-def resnet50_cifar10(pretrained=False, **kwargs):
-    if pretrained:
-        raise NotImplementedError('No pretrained ResNets :-(')
-
-    return ResNet(block=Bottleneck, layers=[3, 4, 6, 3], num_classes=10, **kwargs)
-
-
-@register_model
-def stupidnet_cifar10(pretrained=False, **kwargs):
-    return StupidNet()
-
-
-class StupidNet(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = torch.nn.Conv2d(3, 10, 3)
-        self.linear = torch.nn.Linear(9000, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = x.view(x.size(0), -1)
-        x = self.linear(x)
-        return x
-
-
 class LitNet(pl.LightningModule):
     def __init__(self, hparams):
         super(LitNet, self).__init__()

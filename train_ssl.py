@@ -3,18 +3,18 @@ import math
 import os
 import pprint
 import sys
+import time
 
 import torch
 import tqdm
-from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
 
 from data import get_dataloader, DinoTransforms, get_mean_std, default_transforms
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
-from models.models import get_model
 from eval.knn import compute_knn
-from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds
+from models.models import get_model
+from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds, get_model_embed_dim
 from visualize import dino_attention, grad_cam
 
 
@@ -25,8 +25,8 @@ def main(args):
     device = torch.device(args.device)
 
     experiment_name = get_experiment_name(args)
-    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino', exist_ok=True)
-    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{experiment_name}'
+    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()}', exist_ok=True)
+    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()}/{experiment_name}'
     writer = SummaryWriter(output_dir)
     writer.add_text("args", json.dumps(vars(args)))
 
@@ -48,15 +48,18 @@ def main(args):
     train_loader = get_dataloader(
         args.dataset, transforms=transforms, train=True,
         num_workers=args.num_workers,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        subset=args.subset
     )
     train_loader_plain = get_dataloader(
         args.dataset, train=True,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        subset=args.subset
     )
     val_loader_plain = get_dataloader(
         args.dataset, train=False,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        subset=args.subset
     )
 
     # sample one random batch for embedding visualization
@@ -66,7 +69,7 @@ def main(args):
         batch_size=1,
         transforms=default_transforms(224),
         # using a larger input size for visualization
-        sampler=RandomSampler(val_loader_plain.dataset, replacement=True, num_samples=1)
+        subset=args.subset
     )
     example_viz_img, _ = next(iter(val_loader_plain_subset))
     example_viz_img = example_viz_img.to(device)
@@ -79,7 +82,7 @@ def main(args):
         img_size=args.input_size if 'vit_' in args.model else None
     )
 
-    embed_dim = student.embed_dim if 'vit_' in args.model else args.in_dim
+    embed_dim = get_model_embed_dim(student, args.model)
 
     student = MultiCropWrapper(student, MLPHead(in_dim=embed_dim, out_dim=args.out_dim))
     student = student.to(device)
@@ -98,7 +101,9 @@ def main(args):
     teacher.load_state_dict(student.state_dict())
     for param in teacher.parameters():
         param.requires_grad = False
-    print("Dataloaders, student and teacher ready.")
+    print("=> Dataloaders, student and teacher ready.")
+    print(
+        "=> Number of parameters of student: {:.2f}M".format(sum(p.numel() for p in student.parameters()) / 1000000.0))
 
     dino_loss = DINOLoss(
         args.out_dim,
@@ -134,7 +139,7 @@ def main(args):
 
     # momentum parameter is increased to 1. during training with a cosine schedule
     momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
-    print("Loss, optimizer and schedulers ready.")
+    print("=> Loss, optimizer and schedulers ready.")
 
     # cifar10 trainset contains 50000 images
     n_batches = len(train_loader.dataset) // args.batch_size
@@ -156,9 +161,8 @@ def main(args):
             teacher.load_state_dict(checkpoint['teacher'])
             optim.load_state_dict(checkpoint['optimizer'])
             dino_loss.load_state_dict(checkpoint['dino_loss'])
-            # args = checkpoint['args']
             start_epoch = checkpoint['epoch']
-            print(f"Resuming from epoch {start_epoch}")
+            print(f"=> Resuming from epoch {start_epoch}")
         else:
             print(f"=> no checkpoint found at '{path}'")
 
@@ -185,8 +189,10 @@ def main(args):
                 wandb.log({'knn_acc': current_acc}, step=n_steps)
 
             if args.visualize:
-                if 'vit' in args.model:
-                    orig, attentions = dino_attention(student.backbone, args.patch_size, (example_viz_img,), plot=False,
+                if 'vit_' in args.model:
+                    # TODO how to visualize cls token for mobilevit?
+                    orig, attentions = dino_attention([student.backbone], args.patch_size, (example_viz_img,),
+                                                      plot=False,
                                                       path=output_dir)
                 else:
                     orig, attentions = grad_cam(student.backbone, args.model, (example_viz_img,), plot=False,
