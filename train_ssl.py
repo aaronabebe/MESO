@@ -15,7 +15,7 @@ from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradient
 from eval.knn import compute_knn
 from models.models import get_model
 from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds, get_model_embed_dim
-from visualize import dino_attention, grad_cam
+from visualize import dino_attention, grad_cam, t_sne
 
 
 def main(args):
@@ -198,9 +198,12 @@ def main(args):
                 else:
                     orig, attentions = grad_cam(student.backbone, args.model, (example_viz_img,), plot=False,
                                                 path=output_dir)
+
+                tsne_fig = t_sne(student.backbone, val_loader_plain, plot=False, path=output_dir)
                 if args.wandb:
                     wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
                     wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
+                    wandb.log({'tsne': wandb.Image(tsne_fig)}, step=n_steps)
 
             if current_acc > best_acc:
                 save_dict = {

@@ -76,20 +76,21 @@ def t_sne(model, data_loader, plot=True, path=None):
     Visualize model reasoning via t-SNE
     """
     embs, imgs, labels = compute_embeddings(model, data_loader)
-    tsne = TSNE(n_components=2, random_state=123, verbose=1)
+    fig = plt.figure()
+    tsne = TSNE(n_components=2, random_state=123, verbose=1 if plot else 0, init='pca', learning_rate='auto')
     z = tsne.fit_transform(embs)
-    plt.scatter(z[:, 0], z[:, 1], c=labels, cmap='tab10', alpha=0.3)
+    plt.scatter(z[:, 0], z[:, 1], c=labels)
 
     if not path:
         path = f"./plots/tsne"
 
     os.makedirs(path, exist_ok=True)
-    plt.savefig(f"{path}/{time.ctime()}_tsne.svg")
+    fig.savefig(f"{path}/{time.ctime()}_tsne.svg")
 
     if plot:
         plt.show()
 
-    plt.close()
+    return fig
 
 
 @torch.no_grad()
@@ -269,7 +270,7 @@ def main(args):
         dl = get_dataloader(
             args.dataset,
             transforms=default_transforms(args.input_size),
-            subset=2000,
+            subset=-1,
             train=False, batch_size=args.batch_size
         )
         t_sne(model, dl)
