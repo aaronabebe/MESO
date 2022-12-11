@@ -13,11 +13,13 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [x] test dino with resnet -> convnext
 - [x] integrate official dino paper attn visualization
 - [x] add vit impl from dino paper
-- [ ] fix tensorboard embedding visualizations
-- [ ] cleanup experiment tracking (naming/saving models/saving plots/folder structure/timestamps)
+- [x] ~~fix tensorboard embedding visualizations~~ -> tsne instead
+- [x] cleanup experiment tracking (naming/saving models/saving plots/folder structure/timestamps)
 - [ ] improve logfiles
-- [ ] try out and add mobile-vit
+- [x] try out and add mobile-vit
 - [ ] try out guild ai
+- [ ] log representation to check for collapse of model
+- [ ] log loss per epoch
 
 - [x] overfit on single batch
 - [x] add continue from checkpoint

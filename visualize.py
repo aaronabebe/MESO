@@ -8,8 +8,8 @@ import torch
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-from torch.nn import functional as F
 from sklearn.manifold import TSNE
+from torch.nn import functional as F
 
 from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std
 from models.models import get_eval_model
@@ -75,7 +75,7 @@ def t_sne(model, data_loader, plot=True, path=None):
     """
     Visualize model reasoning via t-SNE
     """
-    embs, imgs, labels = compute_embeddings(model, data_loader)
+    embs, _, labels = compute_embeddings(model, data_loader)
     fig = plt.figure()
     tsne = TSNE(n_components=2, random_state=123, verbose=1 if plot else 0, init='pca', learning_rate='auto')
     z = tsne.fit_transform(embs)
@@ -269,7 +269,6 @@ def main(args):
         )
         dl = get_dataloader(
             args.dataset,
-            transforms=default_transforms(args.input_size),
             subset=-1,
             train=False, batch_size=args.batch_size
         )

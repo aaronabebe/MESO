@@ -178,7 +178,7 @@ class VisionTransformer(nn.Module):
     def get_last_selfattention(self, x):
         x = self.prepare_tokens(x)
         for i, blk in enumerate(self.blocks):
-            if i < len(self.blocks) - 2:
+            if i < len(self.blocks) - 1:
                 x = blk(x)
             else:
                 # return attention of the last block

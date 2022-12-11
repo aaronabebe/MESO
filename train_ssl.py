@@ -9,6 +9,7 @@ import torch
 import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
+import wandb
 from data import get_dataloader, DinoTransforms, get_mean_std, default_transforms
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
@@ -31,7 +32,6 @@ def main(args):
     writer.add_text("args", json.dumps(vars(args)))
 
     if args.wandb:
-        import wandb
         wandb.init(project="dino", config=vars(args))
         wandb.watch_called = False
 
@@ -67,7 +67,7 @@ def main(args):
         args.dataset,
         train=False,
         batch_size=1,
-        transforms=default_transforms(224),
+        transforms=default_transforms(32),
         # using a larger input size for visualization
         subset=1
     )
@@ -127,7 +127,7 @@ def main(args):
         raise ValueError(f'Unknown optimizer: {args.optimizer}')
 
     lr_schedule = dino_cosine_scheduler(
-        args.learning_rate * args.batch_size / 256,
+        args.learning_rate * args.batch_size / 128,
         args.min_lr,
         args.epochs, len(train_loader),
         warmup_epochs=args.warmup_epochs,
@@ -172,40 +172,14 @@ def main(args):
     for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
         if args.eval:
             student.eval()
+            teacher.eval()
 
-            # TODO fix this: compute embeddings for tensorboard
-            # embs, imgs, labels = compute_embeddings(student.backbone, val_loader_plain_subset)
-            # writer.add_embedding(
-            #     embs,
-            #     metadata=labels,
-            #     label_img=imgs,
-            #     global_step=n_steps,
-            #     tag="embedding"
-            # )
+            eval_model(args, example_viz_img, n_steps, output_dir, student, train_loader_plain,
+                       val_loader_plain, writer, wandb, prefix='student')
+            teacher_knn_acc = eval_model(args, example_viz_img, n_steps, output_dir, student, train_loader_plain,
+                                         val_loader_plain, writer, wandb, prefix='teacher')
 
-            # knn eval
-            current_acc = compute_knn(student.backbone, train_loader_plain, val_loader_plain)
-            writer.add_scalar('knn_acc', current_acc, n_steps)
-            if args.wandb:
-                wandb.log({'knn_acc': current_acc}, step=n_steps)
-
-            if args.visualize:
-                if 'vit_' in args.model:
-                    # TODO how to visualize cls token for mobilevit?
-                    orig, attentions = dino_attention([student.backbone], args.patch_size, (example_viz_img,),
-                                                      plot=False,
-                                                      path=output_dir)
-                else:
-                    orig, attentions = grad_cam(student.backbone, args.model, (example_viz_img,), plot=False,
-                                                path=output_dir)
-
-                tsne_fig = t_sne(student.backbone, val_loader_plain, plot=False, path=output_dir)
-                if args.wandb:
-                    wandb.log({'orig': wandb.Image(orig)}, step=n_steps)
-                    wandb.log({'attention_maps': [wandb.Image(img) for img in attentions]}, step=n_steps)
-                    wandb.log({'tsne': wandb.Image(tsne_fig)}, step=n_steps)
-
-            if current_acc > best_acc:
+            if teacher_knn_acc > best_acc:
                 save_dict = {
                     'student': student.state_dict(),
                     'teacher': teacher.state_dict(),
@@ -221,8 +195,9 @@ def main(args):
                     artifact.add_file(save_path)
                     wandb.log_artifact(artifact)
 
-                best_acc = current_acc
+                best_acc = teacher_knn_acc
             student.train()
+            teacher.train()
 
         for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1,
                                          leave=False):
@@ -255,15 +230,42 @@ def main(args):
                     param_k.data.mul(m).add_((1 - m) * param_q.detach().data)
 
             writer.add_scalar("train_loss", loss.item(), n_steps)
+            writer.add_scalar("epoch", epoch, n_steps)
+            writer.add_scalar("teacher_momentum", m, n_steps)
             writer.add_scalar("lr", optim.param_groups[0]['lr'], n_steps)
             writer.add_scalar("weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
             if args.wandb:
                 wandb.log({
+                    "epoch": epoch,
                     "train_loss": loss.item(),
                     "lr": optim.param_groups[0]['lr'],
                     "weight_decay": optim.param_groups[0]['weight_decay'],
+                    "teacher_momentum": m,
                 }, step=n_steps)
             n_steps += 1
+
+
+def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_plain, val_loader_plain, writer,
+               wandb, prefix):
+    current_acc = compute_knn(model.backbone, train_loader_plain, val_loader_plain)
+    writer.add_scalar(f'{prefix}_knn_acc', current_acc, n_steps)
+    if args.wandb:
+        wandb.log({f'{prefix}_knn_acc': current_acc}, step=n_steps)
+    if args.visualize:
+        if 'vit_' in args.model:
+            # TODO how to visualize cls token for mobilevit?
+            orig, attentions = dino_attention([model.backbone], args.patch_size, (example_viz_img,),
+                                              plot=False,
+                                              path=output_dir)
+        else:
+            orig, attentions = grad_cam(model.backbone, args.model, (example_viz_img,), plot=False,
+                                        path=output_dir)
+
+        tsne_fig = t_sne(model.backbone, val_loader_plain, plot=False, path=output_dir)
+        if args.wandb:
+            wandb.log({f'{prefix}_grads': [wandb.Image(img) for img in attentions]}, step=n_steps)
+            wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)
+    return current_acc
 
 
 if __name__ == '__main__':

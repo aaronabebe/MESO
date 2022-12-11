@@ -51,7 +51,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
     parser.add_argument("--train_subset", type=int, default=-1, help="Subset of dataset for training.")
-    parser.add_argument("--test_subset", type=int, default=2000,
+    parser.add_argument("--test_subset", type=int, default=3000,
                         help="Subset of dataset for faster testing and evaluation (Default 2000)")
     parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
@@ -62,7 +62,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--num_classes", type=int, default=0, help="Number of classes in the dataset. (Defaults to 0)")
     parser.add_argument("--patch_size", type=int, default=4, help="Patch size for ViT.")
 
-    parser.add_argument("--in_dim", type=int, default=192, help="Size of DINO MLPHead hidden layer input dims")
     parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
     parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.5),
@@ -99,8 +98,6 @@ def get_args() -> argparse.Namespace:
     parser.add_argument('--weight_decay_end', type=float, default=0.4, help="""Final value of the
         weight decay. We use a cosine schedule for WD and using a larger decay by
         the end of training improves performance for ViTs.""")
-    parser.add_argument("--lr_decay", type=float, default=0.5, help="Learning rate decay for optimizer")
-    parser.add_argument("--warmup_steps", type=float, default=3, help="Warmup steps when using cosine LR scheduler.")
 
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")

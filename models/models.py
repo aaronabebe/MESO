@@ -4,7 +4,7 @@ import pytorch_lightning as pl
 import timm
 import torch
 import wandb
-from timm.models import register_model, ResNet, Bottleneck
+from timm.models import register_model
 from torch import nn
 from torch.nn import functional as F
 from torchmetrics.functional import accuracy
