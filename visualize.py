@@ -94,7 +94,7 @@ def t_sne(model, data_loader, plot=True, path=None):
 
 
 @torch.no_grad()
-def dino_attention(models: list[torch.nn.Module], patch_size, data, plot=True, path=None):
+def dino_attention(models, patch_size, data, plot=True, path=None):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -116,8 +116,7 @@ def dino_attention(models: list[torch.nn.Module], patch_size, data, plot=True, p
 
     all_attentions = []
     for i, model in enumerate(models):
-        all_attentions.append(model.get_last_selfattention(img))
-        attentions = all_attentions[i]
+        attentions = model.get_last_selfattention(img)
 
         nh = attentions.shape[1]  # number of head
 
@@ -126,8 +125,9 @@ def dino_attention(models: list[torch.nn.Module], patch_size, data, plot=True, p
         attentions = attentions.reshape(nh, w_featmap, h_featmap)
         attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
 
-        fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+        all_attentions.append(attentions)
 
+        fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
         if len(data) > 1:
             fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
 
@@ -151,7 +151,6 @@ def dino_attention(models: list[torch.nn.Module], patch_size, data, plot=True, p
             plt.show()
 
     plt.close()
-
     return img[0], all_attentions[0]
 
 

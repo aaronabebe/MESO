@@ -352,3 +352,8 @@ testing different training configurations and datasets for a few epochs in colab
 
 checking andrej karpathys training recipe for reference [link to his blog](http://karpathy.github.io/2019/04/25/recipe/)
 
+
+## 03.12.2022
+
+idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
+-> depends on the data and the model though

@@ -265,6 +265,9 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
         if args.wandb:
             wandb.log({f'{prefix}_grads': [wandb.Image(img) for img in attentions]}, step=n_steps)
             wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)
+
+        tsne_fig.close()
+
     return current_acc
 
 
