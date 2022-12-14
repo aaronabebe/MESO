@@ -56,7 +56,7 @@ class MLPHead(nn.Module):
     taken from official DINO implementation
     """
 
-    def __init__(self, in_dim, out_dim, use_bn=False, norm_last_layer=True, nlayers=3, hidden_dim=512,
+    def __init__(self, in_dim, out_dim, use_bn=False, norm_last_layer=False, nlayers=3, hidden_dim=512,
                  bottleneck_dim=256):
         super().__init__()
         nlayers = max(nlayers, 1)

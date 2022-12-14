@@ -76,6 +76,16 @@ def convnext_pico(pretrained=False, pretrained_cfg=None, **kwargs):
 
 
 @register_model
+def convnext_femto(pretrained=False, pretrained_cfg=None, **kwargs):
+    return ConvNeXt(depths=[2, 2, 6, 2], dims=[48, 96, 192, 384], **kwargs)
+
+
+@register_model
+def convnext_atto(pretrained=False, pretrained_cfg=None, **kwargs):
+    return ConvNeXt(depths=[2, 2, 6, 2], dims=[40, 80, 160, 320], **kwargs)
+
+
+@register_model
 def vit_tiny_dino_cifar10(pretrained=False, **kwargs):
     """
     ViT-Tiny (Vit-T/8) for DINO CIFAR10 training

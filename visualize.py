@@ -38,6 +38,8 @@ def grad_cam(model, model_name, data, plot=True, path=None):
         target_layer = [model.blocks[-1].norm1]
     elif 'convnext' in model_name or 'mobilevit' in model_name:
         target_layer = [model.stages[-1][-1]]
+    elif 'mobilenet' in model_name:
+        target_layer = [model.blocks[-1][0].bn1]
     else:
         target_layer = [model.layer4[-1]]
 
@@ -90,6 +92,7 @@ def t_sne(model, data_loader, plot=True, path=None):
     if plot:
         plt.show()
 
+    plt.close()
     return fig
 
 

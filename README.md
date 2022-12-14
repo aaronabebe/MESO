@@ -19,14 +19,18 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [x] try out and add mobile-vit
 - [ ] try out guild ai
 - [ ] log representation to check for collapse of model
-- [ ] log loss per epoch
-
+- [x] log loss per epoch
 - [x] overfit on single batch
 - [x] add continue from checkpoint
 - [ ] add wandb run resuming
-- [ ] parallelize knn evaluation
-- [ ] add train scripts for finetuning self-supervised models
+- [x] add train scripts for finetuning self-supervised models
 - [x] add fixed seeds
+- [x] implement LARS optim
+- [ ] implement contrastive learning script
+
+## Notes
+
+supervised training with contrastive loss
 
 ## Prerequisites
 
@@ -48,20 +52,24 @@ pip install -r requirements.txt
 Train self-supervised ViT model:
 
 ```shell
- python train_ssl.py --device cuda --model vit_tiny_dino_cifar10 --optimizer adamw --epochs 100 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1.
+ python train_ssl.py --device cuda --model vit_tiny --eval --visualize dino_attn
 ```
 
 Train self-supervised ResNet model:
 
 ```shell
-python train_ssl.py --device cuda --model resnet26_dino_cifar10 --optimizer adamw --epochs 100 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --in_dim 2048
+python train_ssl.py --device cuda --model resnet26_dino_cifar10 --eval --visualize grad_cam
+```
 
+Train self-supervised MobileNetV3 model:
+
+```shell
+python train_ssl.py --model mobilenetv3_small_100 --batch_size 512 --eval --visualize grad_cam --optimizer lars --weight_decay 1e-5 --weight_decay_end 1e-5 --learning_rate 0.48 --norm_last_layer --wandb
 ```
 
 Train self-supervised ConvNeXt on fashion-mnist:
 
 ```shell
-python train_ssl.py --device cpu --model convnext_tiny --optimizer adamw --epochs 100 --batch_size 128 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --warmup_epochs 15 --dataset fashion-mnist --input_channels 1 --in_dim 768
 python train_ssl.py --device cuda --model convnext_pico --optimizer adamw --epochs 200 --batch_size 128 --learning_rate 0.03 --local_crops_scale 0.2 0.5 --global_crops_scale 0.7 1. --num_classes 0 --weight_decay 1e-4 --weight_decay_end 1e-4 --dataset fashion-mnist --input_channels 1 --input_size 32 --in_dim 512
 ```
 

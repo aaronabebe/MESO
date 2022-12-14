@@ -61,6 +61,10 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
     parser.add_argument("--num_classes", type=int, default=0, help="Number of classes in the dataset. (Defaults to 0)")
     parser.add_argument("--patch_size", type=int, default=4, help="Patch size for ViT.")
+    parser.add_argument('--norm_last_layer', default=False, action='store_true',
+                        help="""Whether or not to weight normalize the last layer of the DINO head.
+        Not normalizing leads to better performance but can make the training unstable.
+        In our experiments, we typically set this paramater to False with vit_small and True with vit_base.""")
 
     parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
@@ -86,7 +90,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--warmup_epochs", default=10, type=int,
                         help="Number of epochs for the linear learning-rate warm up.")
 
-    parser.add_argument("--optimizer", type=str, default='adamw', choices=['sgd', 'adam', 'adamw'],
+    parser.add_argument("--optimizer", type=str, default='adamw', choices=['sgd', 'adam', 'adamw', 'lars'],
                         help="Optimizer to use.")
     parser.add_argument("--sam", action='store_true', default=False,
                         help='Use SAM in conjunction with standard chosen optimizer.')
@@ -162,13 +166,55 @@ def eval_accuracy(output, target, topk=(1, 5)):
             return acc
 
 
+class LARS(torch.optim.Optimizer):
+    """
+    Almost copy-paste from https://github.com/facebookresearch/barlowtwins/blob/main/main.py
+    """
+
+    def __init__(self, params, lr=0, weight_decay=0, momentum=0.9, eta=0.001,
+                 weight_decay_filter=None, lars_adaptation_filter=None):
+        defaults = dict(lr=lr, weight_decay=weight_decay, momentum=momentum,
+                        eta=eta, weight_decay_filter=weight_decay_filter,
+                        lars_adaptation_filter=lars_adaptation_filter)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self):
+        for g in self.param_groups:
+            for p in g['params']:
+                dp = p.grad
+
+                if dp is None:
+                    continue
+
+                if p.ndim != 1:
+                    dp = dp.add(p, alpha=g['weight_decay'])
+
+                if p.ndim != 1:
+                    param_norm = torch.norm(p)
+                    update_norm = torch.norm(dp)
+                    one = torch.ones_like(param_norm)
+                    q = torch.where(param_norm > 0.,
+                                    torch.where(update_norm > 0,
+                                                (g['eta'] * param_norm / update_norm), one), one)
+                    dp = dp.mul(q)
+
+                param_state = self.state[p]
+                if 'mu' not in param_state:
+                    param_state['mu'] = torch.zeros_like(p)
+                mu = param_state['mu']
+                mu.mul_(g['momentum']).add_(dp)
+
+                p.add_(mu, alpha=-g['lr'])
+
+
 def get_model_embed_dim(model, arch_name):
     if 'vit_' in arch_name:
         return model.embed_dim
-    elif 'mobilevit' in arch_name:
-        return model.num_features
-    else:
+    elif 'convnext' in arch_name:
         return model.head.in_features
+    else:
+        return model.num_features
 
 
 def grad_cam_reshape_transform(tensor, height=4, width=4):

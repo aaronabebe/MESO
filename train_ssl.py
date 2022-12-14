@@ -13,9 +13,9 @@ import wandb
 from data import get_dataloader, DinoTransforms, get_mean_std, default_transforms
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
-from eval.knn import compute_knn
+from knn import compute_knn
 from models.models import get_model
-from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds, get_model_embed_dim
+from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds, get_model_embed_dim, LARS
 from visualize import dino_attention, grad_cam, t_sne
 
 
@@ -67,7 +67,7 @@ def main(args):
         args.dataset,
         train=False,
         batch_size=1,
-        transforms=default_transforms(32),
+        transforms=default_transforms(128),
         # using a larger input size for visualization
         subset=1
     )
@@ -85,7 +85,8 @@ def main(args):
 
     embed_dim = get_model_embed_dim(student, args.model)
 
-    student = MultiCropWrapper(student, MLPHead(in_dim=embed_dim, out_dim=args.out_dim))
+    student = MultiCropWrapper(student,
+                               MLPHead(in_dim=embed_dim, out_dim=args.out_dim, norm_last_layer=args.norm_last_layer))
     student = student.to(device)
 
     teacher = get_model(
@@ -95,7 +96,8 @@ def main(args):
         patch_size=args.patch_size if 'vit_' in args.model else None,
         img_size=args.input_size if 'vit_' in args.model else None
     )
-    teacher = MultiCropWrapper(teacher, MLPHead(in_dim=embed_dim, out_dim=args.out_dim))
+    teacher = MultiCropWrapper(teacher,
+                               MLPHead(in_dim=embed_dim, out_dim=args.out_dim, norm_last_layer=args.norm_last_layer))
     teacher = teacher.to(device)
 
     # teacher gets student weights and doesnt learn
@@ -123,11 +125,13 @@ def main(args):
         optim = torch.optim.SGD(params, lr=0, weight_decay=args.weight_decay, momentum=args.momentum)
     elif args.optimizer == 'adamw':
         optim = torch.optim.AdamW(params)
+    elif args.optimizer == 'lars':
+        optim = LARS(params)  # to use with convnet and large batches
     else:
         raise ValueError(f'Unknown optimizer: {args.optimizer}')
 
     lr_schedule = dino_cosine_scheduler(
-        args.learning_rate * args.batch_size / 128,
+        args.learning_rate * args.batch_size / 256,
         args.min_lr,
         args.epochs, len(train_loader),
         warmup_epochs=args.warmup_epochs,
@@ -142,7 +146,6 @@ def main(args):
     momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
     print("=> Loss, optimizer and schedulers ready.")
 
-    # cifar10 trainset contains 50000 images
     n_batches = len(train_loader.dataset) // args.batch_size
     best_acc = 0
     start_epoch = 0
@@ -253,7 +256,6 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
         wandb.log({f'{prefix}_knn_acc': current_acc}, step=n_steps)
     if args.visualize:
         if 'vit_' in args.model:
-            # TODO how to visualize cls token for mobilevit?
             orig, attentions = dino_attention([model.backbone], args.patch_size, (example_viz_img,),
                                               plot=False,
                                               path=output_dir)
@@ -265,8 +267,6 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
         if args.wandb:
             wandb.log({f'{prefix}_grads': [wandb.Image(img) for img in attentions]}, step=n_steps)
             wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)
-
-        tsne_fig.close()
 
     return current_acc
 
