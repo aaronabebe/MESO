@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
-from torch.utils.data import RandomSampler
+from torch.utils.data import RandomSampler, Subset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
@@ -61,8 +61,6 @@ def default_transforms(input_size, mean=None, std=None):
 
 def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                        **kwargs) -> torch.utils.data.DataLoader:
-    shuffle = True
-    sampler = None
     trainset = torchvision.datasets.FashionMNIST(
         root=DEFAULT_DATA_DIR,
         train=train,
@@ -70,17 +68,14 @@ def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_work
         transform=transforms or default_fashion_mnist_transforms(),
     )
     if subset > 0:
-        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
-        shuffle = False
+        trainset = Subset(trainset, range(0, subset))
     return torch.utils.data.DataLoader(
-        trainset, shuffle=shuffle, sampler=sampler, num_workers=num_workers, **kwargs
+        trainset, shuffle=True, num_workers=num_workers, **kwargs
     )
 
 
 def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                **kwargs) -> torch.utils.data.DataLoader:
-    shuffle = True
-    sampler = None
     trainset = torchvision.datasets.MNIST(
         root=DEFAULT_DATA_DIR,
         train=train,
@@ -88,32 +83,28 @@ def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int
         transform=transforms or default_mnist_transforms(),
     )
     if subset > 0:
-        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
-        shuffle = False
+        trainset = Subset(trainset, range(0, subset))
     return torch.utils.data.DataLoader(
-        trainset, shuffle=shuffle, sampler=sampler, num_workers=num_workers, **kwargs
+        trainset, shuffle=True, num_workers=num_workers, **kwargs
     )
 
 
 def _get_cifar10c(transforms: torchvision.transforms, num_workers: int, subset: int,
                   cname: str = random.choice(CIFAR_10_CORRUPTIONS), **kwargs):
-    sampler = None
     evalset = CIFAR10CDataset(
         './data/CIFAR-10-C',
         cname,
         tranform=transforms or default_cifar10_transforms()
     )
     if subset > 0:
-        sampler = RandomSampler(evalset, replacement=True, num_samples=subset)
+        evalset = Subset(evalset, range(0, subset))
     return torch.utils.data.DataLoader(
-        evalset, shuffle=False, sampler=sampler, num_workers=num_workers, **kwargs
+        evalset, shuffle=False, num_workers=num_workers, **kwargs
     )
 
 
 def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
                  **kwargs) -> torch.utils.data.DataLoader:
-    shuffle = True
-    sampler = None
     trainset = torchvision.datasets.CIFAR10(
         root=DEFAULT_DATA_DIR,
         train=train,
@@ -121,10 +112,9 @@ def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: i
         transform=transforms or default_cifar10_transforms(),
     )
     if subset > 0:
-        sampler = RandomSampler(trainset, replacement=True, num_samples=subset)
-        shuffle = False
+        trainset = Subset(trainset, range(0, subset))
     return torch.utils.data.DataLoader(
-        trainset, shuffle=shuffle, num_workers=num_workers, sampler=sampler, **kwargs
+        trainset, shuffle=True, num_workers=num_workers, **kwargs
     )
 
 
