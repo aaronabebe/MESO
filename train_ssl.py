@@ -41,6 +41,7 @@ def main(args):
         args.n_local_crops,
         args.local_crops_scale,
         args.global_crops_scale,
+        local_crop_input_factor=args.local_crop_input_factor,
         mean=mean,
         std=std
     )
@@ -177,8 +178,6 @@ def main(args):
             student.eval()
             teacher.eval()
 
-            eval_model(args, example_viz_img, n_steps, output_dir, student, train_loader_plain,
-                       val_loader_plain, writer, wandb, prefix='student')
             teacher_knn_acc = eval_model(args, example_viz_img, n_steps, output_dir, student, train_loader_plain,
                                          val_loader_plain, writer, wandb, prefix='teacher')
 

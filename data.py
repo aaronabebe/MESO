@@ -120,7 +120,9 @@ def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: i
 
 class DinoTransforms:
     def __init__(
-            self, input_size, local_crops_number, local_crops_scale, global_crops_scale, mean=CIFAR10_MEAN,
+            self, input_size, local_crops_number, local_crops_scale, global_crops_scale,
+            local_crop_input_factor=2,
+            mean=CIFAR10_MEAN,
             std=CIFAR10_STD
     ):
         self.local_crops_number = local_crops_number
@@ -157,7 +159,7 @@ class DinoTransforms:
         ])
 
         self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(input_size // 2, scale=local_crops_scale,
+            transforms.RandomResizedCrop(input_size // local_crop_input_factor, scale=local_crops_scale,
                                          interpolation=InterpolationMode.BICUBIC),
             flip_and_color_jitter,
             RandomGaussianBlur(p=0.5),

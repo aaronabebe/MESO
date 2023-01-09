@@ -27,6 +27,14 @@ Self-Supervised Learning for Robust Maritime IR/Vision Feature Extraction
 - [x] add fixed seeds
 - [x] implement LARS optim
 - [ ] implement contrastive learning script
+- [ ] try out LeVit
+- [ ] implement knn from [here](https://github.com/zhirongw/lemniscate.pytorch/blob/master/test.py) and check for
+  speedup
+
+- [ ] linear probe best performing CIFAR10 model (convnext-tiny vs. vit-tiny)
+- [ ] retrain convnext-tiny with larger batches for more epochs (args from `solar-rain-44` on w&b)
+- [ ] compare convnext-pico/atto/femto/tiny on CIFAR10
+- [ ] retrain mobilevitv2 on CIFAR10 for more epochs (args from `stilted-frost-53` on w&b)
 
 ## Notes
 

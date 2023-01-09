@@ -70,6 +70,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
     parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.5),
                         help="Scale of local crops for DINO augmentation.")
+    parser.add_argument("--local_crop_input_factor", type=int, default=2,
+                        help="Factor by which the local crops are divided. (Default 2)")
     parser.add_argument("--global_crops_scale", type=float, nargs='+', default=(0.7, 1.),
                         help="Scale of global crops for DINO augmentation.")
     parser.add_argument('--warmup_teacher_temp', default=0.04, type=float,
