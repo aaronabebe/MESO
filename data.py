@@ -118,6 +118,28 @@ def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: i
     )
 
 
+def flip_and_color_jitter():
+    return transforms.Compose([
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomApply(
+            [transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
+            p=0.8
+        ),
+        transforms.RandomGrayscale(p=0.2),
+    ])
+
+
+def random_gaussian_blur(p):
+    return transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=p)
+
+
+def normalize(mean, std):
+    return transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean, std),
+    ])
+
+
 class DinoTransforms:
     def __init__(
             self, input_size, local_crops_number, local_crops_scale, global_crops_scale,
@@ -126,22 +148,45 @@ class DinoTransforms:
             std=CIFAR10_STD
     ):
         self.local_crops_number = local_crops_number
-        RandomGaussianBlur = lambda p: transforms.RandomApply(
-            [transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=p)
 
-        flip_and_color_jitter = transforms.Compose([
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomApply(
-                [transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
-                p=0.8
-            ),
-            transforms.RandomGrayscale(p=0.2),
+        self.global_transfo1 = transforms.Compose([
+            transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
+            flip_and_color_jitter(),
+            random_gaussian_blur(1.0),
+            normalize(mean, std),
         ])
 
-        normalize = transforms.Compose([
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std),
+        self.global_transfo2 = transforms.Compose([
+            transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
+            flip_and_color_jitter(),
+            random_gaussian_blur(0.1),
+            transforms.RandomSolarize(170, p=0.2),
+            normalize(mean, std),
         ])
+
+        self.local_transfo = transforms.Compose([
+            transforms.RandomResizedCrop(input_size // local_crop_input_factor, scale=local_crops_scale,
+                                         interpolation=InterpolationMode.BICUBIC),
+            flip_and_color_jitter(),
+            random_gaussian_blur(p=0.5),
+            normalize(mean, std),
+        ])
+
+    def __call__(self, img):
+        all_crops = [self.global_transfo1(img), self.global_transfo2(img)]
+        for _ in range(self.local_crops_number):
+            all_crops.append(self.local_transfo(img))
+        return all_crops
+
+
+class SailingDinoTransforms:
+    def __init__(
+            self, input_size, local_crops_number, local_crops_scale, global_crops_scale,
+            local_crop_input_factor=2,
+            mean,
+            std
+    ):
+        self.local_crops_number = local_crops_number
 
         self.global_transfo1 = transforms.Compose([
             transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),

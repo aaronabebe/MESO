@@ -334,7 +334,6 @@ implements warmup and proper scheduling, loss looks better now for short trainin
 batch sizes
 starting on convnext implementation now
 
-
 ## 23.11.2022
 
 implemented convnext, training now, also implemented official attention visualization, which looks very different
@@ -347,13 +346,66 @@ vincze wegen tu hardware schreiben
 
 ## 24.11.2022
 
-setup wandb to log 
-testing different training configurations and datasets for a few epochs in colab to see if everything seems to work correctly
+setup wandb to log
+testing different training configurations and datasets for a few epochs in colab to see if everything seems to work
+correctly
 
 checking andrej karpathys training recipe for reference [link to his blog](http://karpathy.github.io/2019/04/25/recipe/)
-
 
 ## 03.12.2022
 
 idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
 -> depends on the data and the model though
+
+## 18.01.2023
+
+getting started with fiftyone integration, exploring dataset
+thinking about using fivecrop transform for DINO
+
+for the beginning only filter large detection crops as image and use those
+
+number of unique classes: 35 -> maybe i can use a reduced set of classes?
+
+
+```shell
+{
+    'ALGAE': 1,
+    'BIRD': 65,
+    'BOAT': 262,
+    'BOAT_WITHOUT_SAILS': 456,
+    'BUOY': 319,
+    'CONSTRUCTION': 207,
+    'CONTAINER': 51,
+    'CONTAINER_SHIP': 267,
+    'CRUISE_SHIP': 108,
+    'DOLPHIN': 2,
+    'FAR_AWAY_OBJECT': 4650,
+    'FISHING_BUOY': 90,
+    'FISHING_SHIP': 17,
+    'FLOTSAM': 261,
+    'HARBOUR_BUOY': 94,
+    'HORIZON': 1,
+    'HUMAN': 9,
+    'HUMAN_IN_WATER': 11,
+    'HUMAN_ON_BOARD': 173,
+    'KAYAK': 3,
+    'LEISURE_VEHICLE': 23,
+    'MARITIME_VEHICLE': 936,
+    'MOTORBOAT': 408,
+    'OBJECT_REFLECTION': 30,
+    'SAILING_BOAT': 534,
+    'SAILING_BOAT_WITH_CLOSED_SAILS': 576,
+    'SAILING_BOAT_WITH_OPEN_SAILS': 528,
+    'SEAGULL': 3,
+    'SHIP': 347,
+    'SUN_REFLECTION': 11,
+    'UNKNOWN': 5,
+    'WATERTRACK': 105
+}
+```
+
+
+
+
+
+
