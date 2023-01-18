@@ -201,7 +201,7 @@ def main(args):
             student.train()
             teacher.train()
 
-        for it, (images, _) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1,
+        for it, (images, _) in tqdm.auto.tqdm(enumerate(train_loader), total=n_batches, desc=" batch", position=1,
                                          leave=False):
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):

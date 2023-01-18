@@ -88,7 +88,7 @@ def main(args: argparse.Namespace):
             linear_classifier.eval()
             with torch.no_grad():
                 acc1s, acc5s = [], []
-                for it, (images, labels) in tqdm.tqdm(enumerate(val_loader), desc="val batches ", position=2,
+                for it, (images, labels) in tqdm.autonotebook.tqdm(enumerate(val_loader), desc="val batches ", position=2,
                                                       leave=False):
                     images, labels = images.to(device), labels.to(device)
                     with torch.no_grad():

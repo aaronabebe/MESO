@@ -357,3 +357,42 @@ checking andrej karpathys training recipe for reference [link to his blog](http:
 
 idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
 -> depends on the data and the model though
+
+
+## 04.12.2022
+
+working on training with smaller convnexts (atto/femto)
+
+## 10.12.2022
+
+retraining good performing older models on colab pro, implemented linear probing
+
+## 11.01.2023
+training ViT/ConvNext
+trying to get data from Sea.ai fiftyone server, a lot of troubleshooting
+
+setting up new pc from ben with better gpu
+
+## 12.01.2023
+
+retraining MobileNetv3 on new pc, using LARS optimizer getting better results than AdamW
+also retraining convnext_pico now, also works great with LARS
+currently running with 500 epoch trainings, convnext kNN is still increasing -> try 1000 epochs next?
+
+-> try one larger version of mobilenetv3? 
+-> try convnextv2_pico? 
+
+## 13.01.2023
+
+finally got the first sample of sea.ai dataset, 20.000 datapoints
+will implement new pre-processing and data loading now, then try training with DINO
+
+i will also try to integrate contrastive loss and SimCLR into the training pipeline next
+
+for the CIFAR10 models, im still missing linear evaluation on the best ones, and then evaluation on CIFAR10-C
+prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100 
+
+
+
+
+

@@ -4,7 +4,7 @@ import pprint
 import numpy as np
 import torch
 from torch.nn import functional as F
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from data import get_dataloader
 from models.models import get_eval_model
