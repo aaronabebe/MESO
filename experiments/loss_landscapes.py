@@ -2,6 +2,38 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
+import loss_landscapes as ll
+import os
+
+
+def loss_landscape(model, model_name, data, steps=40):
+    metric = ll.metrics.Loss(torch.nn.CrossEntropyLoss(), data[0], data[1])
+    loss_data = ll.random_plane(
+        model=model,
+        metric=metric,
+        distance=10,
+        steps=steps,
+        normalization='filter',
+        deepcopy_model=True
+    )
+
+    sub_dir_name = 'loss_landscape'
+    os.makedirs(f'./plots/{model_name}/{sub_dir_name}', exist_ok=True)
+
+    # plot 2D
+    plt.contour(loss_data, levels=50)
+    plt.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}_contour_2D.svg")
+    plt.clf()
+
+    # plot 3D
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    X = np.array([[j for j in range(steps)] for i in range(steps)])
+    Y = np.array([[i for _ in range(steps)] for i in range(steps)])
+    ax.plot_surface(X, Y, loss_data, rstride=1, cstride=1, cmap='viridis', edgecolor='none')
+    ax.set_title('Surface Plot of Loss Landscape')
+
+    fig.savefig(f"./plots/{model_name}/{sub_dir_name}/{time.time()}_{len(data[0])}_surface_3D.svg")
 
 
 def get_random_vectors(model):

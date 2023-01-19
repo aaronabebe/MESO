@@ -4,10 +4,10 @@ import pprint
 import numpy as np
 import torch
 from torch.nn import functional as F
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from data import get_dataloader
-from models import get_eval_model
+from models.models import get_eval_model
 from utils import eval_accuracy, CIFAR_10_CORRUPTIONS
 
 
@@ -23,7 +23,7 @@ def parse_args():
 def main(args: argparse.Namespace):
     device = torch.device(args.device)
 
-    model = get_eval_model(args.model)
+    model = get_eval_model(args.model, device, args.dataset)
     model.to(device)
 
     if args.corruption:

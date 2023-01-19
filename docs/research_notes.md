@@ -49,18 +49,18 @@ See: Li, H., Xu, Z., Taylor, G., Studer, C., and Goldstein, T. (2017). Visualizi
 
 What are
 
-- [ ] few shot learning?
+- [x] few shot learning?
 - [x] representation learning?
-- [ ] zero shot?
-- [ ] depthwise conv (used in mobilenet)
-- [ ] FLOPs
-- [ ] layernorm
-- [ ] DINO teacher centering?
+- [x] zero shot?
+- [x] depthwise conv (used in mobilenet)
+- [x] FLOPs
+- [x] layernorm
+- [x] DINO teacher centering?
 - [ ] JFT-300M
 - [ ] Inception style pre-processing
-- [ ] GPaCo/PaCo
-- [ ] t-SNE
-- [ ] KL-divergence
+- [x] GPaCo/PaCo
+- [x] t-SNE
+- [x] KL-divergence
 
 Also check out ConvNext paper and Momentum Contrast.
 
@@ -230,10 +230,10 @@ SAM-ViT papers uses 10% of ImageNet training set (~120.000) and resolution of 50
 TODOs:
 
 - [ ] eval loss landscape for pretrained ViT
-- [ ] cleanup code and push to repo
-- [ ] implement CIFAR10-C eval in pipeline
-- [ ] understand/implement code for visualizing attention maps
-- [ ] train ResNet
+- [x] cleanup code and push to repo
+- [x] implement CIFAR10-C eval in pipeline
+- [x] understand/implement code for visualizing attention maps
+- [ ] ~~train ResNet~~
 
 ViT-T/8 on M1 ~1.8it/s
 ViT-T/8 on Lenovo ~3.5it/s
@@ -312,8 +312,88 @@ also finished first draft of proposal today
 
 ## 14.11.2022
 
-evaluating different model trainings including resnets, vits, found bug in 
-loss calculation, which led to weird eval results, hopefully fixed now, 
+evaluating different model trainings including resnets, vits, found bug in
+loss calculation, which led to weird eval results, hopefully fixed now,
 reading some new papers as well, SimCLR, MAE
 also starting with DINO training implementation
+
+## 16.11.2022
+
+starting with implementation for dino training for cifar10, maybe imagenet-tiny afterwards
+
+## 18.11.2022
+
+first dino implementation without warmup/proper scheduling doesnt converge, loss is stuck at around 6.35
+tried out adapted official implementation with cifar10, which seems to work, stopped training after 40 epochs
+-> will try to implement warmup and proper scheduling now
+-> also will try to implement official attn visualization, because mine looks very different/not as good
+
+## 19.11.2022
+
+implements warmup and proper scheduling, loss looks better now for short training run, got memory problems now due to
+batch sizes
+starting on convnext implementation now
+
+
+## 23.11.2022
+
+implemented convnext, training now, also implemented official attention visualization, which looks very different
+
+kleines datenset overfitten zum testen der implementierung
+
+loss landscapes: mnist versuchen + mpi versuchen
+
+vincze wegen tu hardware schreiben
+
+## 24.11.2022
+
+setup wandb to log 
+testing different training configurations and datasets for a few epochs in colab to see if everything seems to work correctly
+
+checking andrej karpathys training recipe for reference [link to his blog](http://karpathy.github.io/2019/04/25/recipe/)
+
+
+## 03.12.2022
+
+idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
+-> depends on the data and the model though
+
+
+## 04.12.2022
+
+working on training with smaller convnexts (atto/femto)
+
+## 10.12.2022
+
+retraining good performing older models on colab pro, implemented linear probing
+
+## 11.01.2023
+training ViT/ConvNext
+trying to get data from Sea.ai fiftyone server, a lot of troubleshooting
+
+setting up new pc from ben with better gpu
+
+## 12.01.2023
+
+retraining MobileNetv3 on new pc, using LARS optimizer getting better results than AdamW
+also retraining convnext_pico now, also works great with LARS
+currently running with 500 epoch trainings, convnext kNN is still increasing -> try 1000 epochs next?
+
+- [ ] try one larger version of mobilenetv3?
+- [ ] try convnextv2_pico? 
+- [ ] try mobilevitv2_100, weight decay 0.05, min_lr 1e-6, lr 0.02, smaller batch size?
+
+## 13.01.2023
+
+finally got the first sample of sea.ai dataset, 20.000 datapoints
+will implement new pre-processing and data loading now, then try training with DINO
+
+i will also try to integrate contrastive loss and SimCLR into the training pipeline next
+
+for the CIFAR10 models, im still missing linear evaluation on the best ones, and then evaluation on CIFAR10-C
+prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100 
+
+
+
+
 
