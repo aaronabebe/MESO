@@ -49,18 +49,18 @@ See: Li, H., Xu, Z., Taylor, G., Studer, C., and Goldstein, T. (2017). Visualizi
 
 What are
 
-- [ ] few shot learning?
+- [x] few shot learning?
 - [x] representation learning?
-- [ ] zero shot?
-- [ ] depthwise conv (used in mobilenet)
-- [ ] FLOPs
-- [ ] layernorm
-- [ ] DINO teacher centering?
+- [x] zero shot?
+- [x] depthwise conv (used in mobilenet)
+- [x] FLOPs
+- [x] layernorm
+- [x] DINO teacher centering?
 - [ ] JFT-300M
 - [ ] Inception style pre-processing
-- [ ] GPaCo/PaCo
-- [ ] t-SNE
-- [ ] KL-divergence
+- [x] GPaCo/PaCo
+- [x] t-SNE
+- [x] KL-divergence
 
 Also check out ConvNext paper and Momentum Contrast.
 
@@ -230,10 +230,10 @@ SAM-ViT papers uses 10% of ImageNet training set (~120.000) and resolution of 50
 TODOs:
 
 - [ ] eval loss landscape for pretrained ViT
-- [ ] cleanup code and push to repo
-- [ ] implement CIFAR10-C eval in pipeline
-- [ ] understand/implement code for visualizing attention maps
-- [ ] train ResNet
+- [x] cleanup code and push to repo
+- [x] implement CIFAR10-C eval in pipeline
+- [x] understand/implement code for visualizing attention maps
+- [ ] ~~train ResNet~~
 
 ViT-T/8 on M1 ~1.8it/s
 ViT-T/8 on Lenovo ~3.5it/s
@@ -379,8 +379,9 @@ retraining MobileNetv3 on new pc, using LARS optimizer getting better results th
 also retraining convnext_pico now, also works great with LARS
 currently running with 500 epoch trainings, convnext kNN is still increasing -> try 1000 epochs next?
 
--> try one larger version of mobilenetv3? 
--> try convnextv2_pico? 
+- [ ] try one larger version of mobilenetv3?
+- [ ] try convnextv2_pico? 
+- [ ] try mobilevitv2_100, weight decay 0.05, min_lr 1e-6, lr 0.02, smaller batch size?
 
 ## 13.01.2023
 
