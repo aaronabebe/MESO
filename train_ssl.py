@@ -52,29 +52,31 @@ def main(args):
         batch_size=args.batch_size,
         subset=args.train_subset
     )
-    train_loader_plain = get_dataloader(
-        args.dataset, train=True,
-        batch_size=args.batch_size,
-        subset=args.test_subset
-    )
-    val_loader_plain = get_dataloader(
-        args.dataset, train=False,
-        batch_size=args.batch_size,
-        subset=args.test_subset
-    )
 
-    # sample one random batch for embedding visualization
-    val_loader_plain_subset = get_dataloader(
-        args.dataset,
-        train=False,
-        batch_size=1,
-        transforms=default_transforms(128),
-        # using a larger input size for visualization
-        subset=1
-    )
+    if args.eval:
+        train_loader_plain = get_dataloader(
+            args.dataset, train=True,
+            batch_size=args.batch_size,
+            subset=args.test_subset
+        )
+        val_loader_plain = get_dataloader(
+            args.dataset, train=False,
+            batch_size=args.batch_size,
+            subset=args.test_subset
+        )
 
-    example_viz_img, _ = next(iter(val_loader_plain_subset))
-    example_viz_img = example_viz_img.to(device)
+        # sample one random batch for embedding visualization
+        val_loader_plain_subset = get_dataloader(
+            args.dataset,
+            train=False,
+            batch_size=1,
+            transforms=default_transforms(128),
+            # using a larger input size for visualization
+            subset=1
+        )
+
+        example_viz_img, _ = next(iter(val_loader_plain_subset))
+        example_viz_img = example_viz_img.to(device)
 
     student = get_model(
         args.model,

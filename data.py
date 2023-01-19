@@ -9,8 +9,9 @@ from torch.utils.data import RandomSampler, Subset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
+from fo_utils import GROUND_TRUTH_LABEL, get_dataset
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
-    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN
+    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, SAILING_STD, SAILING_MEAN
 
 
 def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = None, train: bool = True,
@@ -27,6 +28,8 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
         return _get_mnist(train, transforms, num_workers, subset, **kwargs)
     elif name == 'fashion-mnist':
         return _get_fashion_mnist(train, transforms, num_workers, subset, **kwargs)
+    elif name == 'fiftyone':
+        return _get_fifty_one(train, transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
@@ -37,6 +40,8 @@ def get_mean_std(dataset):
         return MNIST_MEAN, MNIST_STD
     elif dataset == 'fashion-mnist':
         return FASHION_MNIST_MEAN, FASHION_MNIST_STD
+    elif dataset == 'fiftyone':
+        return SAILING_MEAN, SAILING_STD
     raise NotImplementedError(f'No such dataset: {dataset}')
 
 
@@ -50,6 +55,10 @@ def default_mnist_transforms():
 
 def default_fashion_mnist_transforms():
     return default_transforms(CIFAR10_SIZE, *get_mean_std('fashion-mnist'))
+
+
+def default_fifty_one_transforms():
+    return default_transforms(224, *get_mean_std('fiftyone'))
 
 
 def default_transforms(input_size, mean=None, std=None):
@@ -81,6 +90,20 @@ def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int
         train=train,
         download=True,
         transform=transforms or default_mnist_transforms(),
+    )
+    if subset > 0:
+        trainset = Subset(trainset, range(0, subset))
+    return torch.utils.data.DataLoader(
+        trainset, shuffle=True, num_workers=num_workers, **kwargs
+    )
+
+
+def _get_fifty_one(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
+                   **kwargs) -> torch.utils.data.DataLoader:
+    # load fifty one dataset
+    trainset = FiftyOneTorchDataset(
+        fo_dataset=get_dataset(),
+        transform=transforms or default_fifty_one_transforms(),
     )
     if subset > 0:
         trainset = Subset(trainset, range(0, subset))
@@ -179,45 +202,6 @@ class DinoTransforms:
         return all_crops
 
 
-class SailingDinoTransforms:
-    def __init__(
-            self, input_size, local_crops_number, local_crops_scale, global_crops_scale,
-            local_crop_input_factor=2,
-            mean,
-            std
-    ):
-        self.local_crops_number = local_crops_number
-
-        self.global_transfo1 = transforms.Compose([
-            transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter,
-            RandomGaussianBlur(1.0),
-            normalize,
-        ])
-
-        self.global_transfo2 = transforms.Compose([
-            transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter,
-            RandomGaussianBlur(0.1),
-            transforms.RandomSolarize(170, p=0.2),
-            normalize,
-        ])
-
-        self.local_transfo = transforms.Compose([
-            transforms.RandomResizedCrop(input_size // local_crop_input_factor, scale=local_crops_scale,
-                                         interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter,
-            RandomGaussianBlur(p=0.5),
-            normalize,
-        ])
-
-    def __call__(self, img):
-        all_crops = [self.global_transfo1(img), self.global_transfo2(img)]
-        for _ in range(self.local_crops_number):
-            all_crops.append(self.local_transfo(img))
-        return all_crops
-
-
 class CIFAR10CDataset(torchvision.datasets.VisionDataset):
     def __init__(self, root: str, name: str, tranform=None, target_transform=None):
         super(CIFAR10CDataset, self).__init__(root, transform=tranform, target_transform=target_transform)
@@ -241,3 +225,64 @@ class CIFAR10CDataset(torchvision.datasets.VisionDataset):
 
     def __len__(self):
         return len(self.data)
+
+
+class FiftyOneTorchDataset(torch.utils.data.Dataset):
+    def __init__(self, fo_dataset, transform: torchvision.transforms = None,
+                 ground_truth_label: str = GROUND_TRUTH_LABEL):
+        self.samples = fo_dataset
+
+        self.transforms = transform
+        self.img_paths = self.samples.values("filepath")
+        self.ground_truth_label = ground_truth_label
+
+        self.classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
+        self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path = self.img_paths[idx]
+        sample = self.samples[img_path]
+        img = Image.open(img_path).convert("L")  # TODO handle 16bit and 8bit grayscale correctly while loading
+
+        # crop detection bounding box from image
+        # for now i just crop out the largest detection per image
+        # TODO clean this up in the future
+        largest_crop = None
+        largest_crop_label = None
+        largest_crop_area = 0
+
+        for detection in sample[self.ground_truth_label].detections:
+            if abs(detection.area) > largest_crop_area:
+                width = sample.metadata.width
+                height = sample.metadata.height
+                crop_box = (
+                    (width * detection.bounding_box[0]),
+                    (height * detection.bounding_box[1]),
+                    (width * detection.bounding_box[0]) + (width * detection.bounding_box[2]),
+                    (height * detection.bounding_box[1]) + (height * detection.bounding_box[3])
+                )
+                try:
+                    crop = img.crop(crop_box)
+                # sometimes annotations are from right to left, so coordinates order changes
+                except ValueError:
+                    crop_box = (
+                        (width * detection.bounding_box[0]),
+                        (height * detection.bounding_box[1]) + (height * detection.bounding_box[3]),
+                        (width * detection.bounding_box[0]) + (width * detection.bounding_box[2]),
+                        (height * detection.bounding_box[1]),
+                    )
+                    crop = img.crop(crop_box)
+
+                # crop = np.array(crop, dtype=np.float64)
+                if self.transforms:
+                    crop = self.transforms(crop)
+
+                label = self.labels_map_rev[detection.label]
+                largest_crop = crop
+                largest_crop_label = label
+                largest_crop_area = detection.area
+
+        return largest_crop, torch.as_tensor(largest_crop_label)

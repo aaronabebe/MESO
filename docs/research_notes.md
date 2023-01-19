@@ -366,7 +366,6 @@ for the beginning only filter large detection crops as image and use those
 
 number of unique classes: 35 -> maybe i can use a reduced set of classes?
 
-
 ```shell
 {
     'ALGAE': 1,
@@ -404,6 +403,9 @@ number of unique classes: 35 -> maybe i can use a reduced set of classes?
 }
 ```
 
+## 19.01.2023
+
+working on data-preprocessing
 
 
 

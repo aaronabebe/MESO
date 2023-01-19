@@ -20,6 +20,10 @@ MNIST_STD = (0.3081,)
 FASHION_MNIST_MEAN = (0.2860,)
 FASHION_MNIST_STD = (0.3530,)
 
+# SEE experiments/fo_experiments.py for more calculations
+SAILING_MEAN = (0.4712,)
+SAILING_STD = (0.0447,)
+
 CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
     'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
