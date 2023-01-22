@@ -29,7 +29,7 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
     elif name == 'fashion-mnist':
         return _get_fashion_mnist(train, transforms, num_workers, subset, **kwargs)
     elif name == 'fiftyone':
-        return _get_fifty_one(train, transforms, num_workers, subset, **kwargs)
+        return _get_fifty_one(transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
@@ -62,7 +62,7 @@ def default_fifty_one_transforms():
 
 
 def default_transforms(input_size, mean=None, std=None):
-    t = [transforms.Resize(input_size), transforms.ToTensor()]
+    t = [transforms.Resize((input_size, input_size)), transforms.ToTensor()]
     if mean or std:
         t.append(transforms.Normalize(mean=mean, std=std))
     return transforms.Compose(t)
@@ -98,11 +98,11 @@ def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int
     )
 
 
-def _get_fifty_one(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
+def _get_fifty_one(transforms: torchvision.transforms, num_workers: int, subset: int, fo_dataset=None,
                    **kwargs) -> torch.utils.data.DataLoader:
     # load fifty one dataset
     trainset = FiftyOneTorchDataset(
-        fo_dataset=get_dataset(),
+        fo_dataset=fo_dataset,
         transform=transforms or default_fifty_one_transforms(),
     )
     if subset > 0:

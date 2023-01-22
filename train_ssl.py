@@ -13,6 +13,7 @@ import wandb
 from data import get_dataloader, DinoTransforms, get_mean_std, default_transforms
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
+from fo_utils import get_dataset
 from knn import compute_knn
 from models.models import get_model
 from utils import get_args, TENSORBOARD_LOG_DIR, get_experiment_name, fix_seeds, get_model_embed_dim, LARS
@@ -35,48 +36,9 @@ def main(args):
         wandb.init(project="dino", config=vars(args))
         wandb.watch_called = False
 
-    mean, std = get_mean_std(args.dataset)
-    transforms = DinoTransforms(
-        args.input_size,
-        args.n_local_crops,
-        args.local_crops_scale,
-        args.global_crops_scale,
-        local_crop_input_factor=args.local_crop_input_factor,
-        mean=mean,
-        std=std
-    )
-
-    train_loader = get_dataloader(
-        args.dataset, transforms=transforms, train=True,
-        num_workers=args.num_workers,
-        batch_size=args.batch_size,
-        subset=args.train_subset
-    )
-
-    if args.eval:
-        train_loader_plain = get_dataloader(
-            args.dataset, train=True,
-            batch_size=args.batch_size,
-            subset=args.test_subset
-        )
-        val_loader_plain = get_dataloader(
-            args.dataset, train=False,
-            batch_size=args.batch_size,
-            subset=args.test_subset
-        )
-
-        # sample one random batch for embedding visualization
-        val_loader_plain_subset = get_dataloader(
-            args.dataset,
-            train=False,
-            batch_size=1,
-            transforms=default_transforms(128),
-            # using a larger input size for visualization
-            subset=1
-        )
-
-        example_viz_img, _ = next(iter(val_loader_plain_subset))
-        example_viz_img = example_viz_img.to(device)
+    train_loader, train_loader_plain, val_loader_plain, val_loader_plain_subset = get_data_loaders(args)
+    example_viz_img, _ = next(iter(val_loader_plain_subset))
+    example_viz_img = example_viz_img.to(device)
 
     student = get_model(
         args.model,
@@ -247,6 +209,75 @@ def main(args):
                     "teacher_momentum": m,
                 }, step=n_steps)
             n_steps += 1
+
+
+def get_data_loaders(args):
+    mean, std = get_mean_std(args.dataset)
+    transforms = DinoTransforms(
+        args.input_size,
+        args.n_local_crops,
+        args.local_crops_scale,
+        args.global_crops_scale,
+        local_crop_input_factor=args.local_crop_input_factor,
+        mean=mean,
+        std=std
+    )
+
+    if args.dataset == 'fiftyone':
+        train_data, val_data = get_dataset()
+        train_loader = get_dataloader(
+            args.dataset, transforms=transforms, fo_dataset=train_data,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=args.train_subset
+        )
+        train_loader_plain = get_dataloader(
+            args.dataset, fo_dataset=train_data.clone(),
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=args.train_subset
+        )
+        val_loader_plain = get_dataloader(
+            args.dataset, fo_dataset=val_data,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=args.test_subset
+        )
+        val_loader_plain_subset = get_dataloader(
+            args.dataset, fo_dataset=val_data.clone(),
+            batch_size=1,
+            transforms=default_transforms(128),
+            subset=1
+        )
+    else:
+        train_loader = get_dataloader(
+            args.dataset, transforms=transforms, train=True,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=args.train_subset
+        )
+
+        train_loader_plain = get_dataloader(
+            args.dataset, train=True,
+            batch_size=args.batch_size,
+            subset=args.test_subset
+        )
+        val_loader_plain = get_dataloader(
+            args.dataset, train=False,
+            batch_size=args.batch_size,
+            subset=args.test_subset
+        )
+
+        # sample one random batch for embedding visualization
+        val_loader_plain_subset = get_dataloader(
+            args.dataset,
+            train=False,
+            batch_size=1,
+            transforms=default_transforms(128),
+            # using a larger input size for visualization
+            subset=1
+        )
+    return train_loader, train_loader_plain, val_loader_plain, val_loader_plain_subset
 
 
 def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_plain, val_loader_plain, writer,

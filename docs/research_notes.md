@@ -407,6 +407,9 @@ number of unique classes: 35 -> maybe i can use a reduced set of classes?
 
 working on data-preprocessing
 
+## 20.01.2023
+
+fiftyone integration testing
 
 
 
