@@ -79,7 +79,7 @@ def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_work
     if subset > 0:
         trainset = Subset(trainset, range(0, subset))
     return torch.utils.data.DataLoader(
-        trainset, shuffle=True, num_workers=num_workers, **kwargs
+        trainset, shuffle=True, num_workers=num_workers #, **kwargs
     )
 
 
@@ -161,6 +161,24 @@ def normalize(mean, std):
         transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
+
+
+class DinoIRTransforms:
+    def __init__(self):
+        # RandomResizedCrop(224, scale=(0.2, 1.))
+        # RandomHorizontalFlip()
+        # RandomPerspective
+        # implement jitter for grayscale
+
+        # RandomGaussianBlur
+        # RandomSolarize
+        # normalize
+        pass
+
+    def __call__(self, x):
+        return x
+
+
 
 
 class DinoTransforms:

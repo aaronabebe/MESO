@@ -9,7 +9,7 @@ from torch.utils.data import Subset
 from tqdm import tqdm
 from torchvision import transforms
 
-from data import FiftyOneTorchDataset
+from data import FiftyOneTorchDataset, default_fifty_one_transforms
 from fo_utils import DATASET_NAME, GROUND_TRUTH_LABEL, DATASET_DIR, get_dataset
 
 MIN_CROP_SIZE = 32
@@ -45,7 +45,8 @@ def calc_mean_std(loader: torch.utils.data.DataLoader):
 
 
 def main(args):
-    torch_dataset = FiftyOneTorchDataset(get_dataset(), transform=transforms.ToTensor())
+    fo_dataset, _ = get_dataset()
+    torch_dataset = FiftyOneTorchDataset(fo_dataset, transform=default_fifty_one_transforms())
     print('LEN DATASET TOTAL: ', len(torch_dataset))
     if args.mean_std:
         mean, std = calc_mean_std(torch.utils.data.DataLoader(torch_dataset, batch_size=1, shuffle=False))
@@ -53,6 +54,7 @@ def main(args):
         print('STD: ', std)
         return
 
+    # TODO move this to visualize.py
     subset = Subset(torch_dataset, range(16))
     loader = torch.utils.data.DataLoader(subset, shuffle=True, num_workers=0)
 
@@ -65,6 +67,7 @@ def main(args):
         ax.imshow(img.squeeze().numpy())
         ax.axis("off")
     fig.tight_layout()
+    plt.savefig('test.png')
     plt.show()
 
 

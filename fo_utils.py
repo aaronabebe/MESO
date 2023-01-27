@@ -2,15 +2,18 @@ import fiftyone as fo
 from fiftyone import ViewField as F
 
 DATASET_NAME = "SAILING_DATASET"
-DATASET_DIR = "/Users/aaronabebe/Downloads/20000_sample_aaron"
+DATASET_DIR = "/home/aaron/dev/data/20000_sample_aaron"
 GROUND_TRUTH_LABEL = "ground_truth_det"
 
 
 def get_dataset(
         dataset_name: str = DATASET_NAME, dataset_dir: str = DATASET_DIR,
         ground_truth_label: str = GROUND_TRUTH_LABEL, min_crop_size: int = 32,
-        split=(0.8, 0.1)
+        split=(0.9, 0.1)
 ):
+    # this needs to be set to load custom datatypes
+    fo.config.module_path = "custom_embedded_files"
+
     dataset = fo.Dataset.from_dir(
         dataset_dir=dataset_dir,
         dataset_type=fo.types.FiftyOneDataset,

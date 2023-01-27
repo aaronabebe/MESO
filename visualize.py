@@ -12,6 +12,7 @@ from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
 from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std
+from fo_utils import get_dataset
 from models.models import get_eval_model
 from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings
 
@@ -68,6 +69,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
         plt.show()
 
     plt.close()
+    del cam
 
     return input_tensor, [visualization]
 
@@ -164,13 +166,13 @@ def dino_augmentations(data):
     https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/dino/visualize_augmentations.ipynb
     """
 
+    data = data[0]
     # use only one random image for now
-    random_choice = random.randint(0, len(data[0]))
-    cropped_images = [s[random_choice] for s in data[0]]
+    random_choice = random.randint(0, len(data[0]) - 1)
+    cropped_images = [s[random_choice] for s in data]
 
     n = int(np.ceil(len(cropped_images) ** .5))
     fig, axs = plt.subplots(n, n, figsize=(n * 3, n * 3))
-    fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
     for i, img in enumerate(cropped_images):
         ax = axs[i // n][i % n]
         ax.imshow(reshape_for_plot(img))
@@ -184,6 +186,10 @@ def dino_augmentations(data):
 
 def main(args):
     print(f'Visualizing {args.visualize} for {args.model} model...')
+
+    fo_dataset = None
+    if args.dataset == 'fiftyone':
+        fo_dataset, _ = get_dataset()
 
     if args.visualize == 'dino_attn':
         models = []
@@ -216,6 +222,7 @@ def main(args):
         dl = get_dataloader(
             args.dataset,
             transforms=default_transforms(args.input_size),
+            fo_dataset=fo_dataset,
             train=False,
             subset=1,
             batch_size=args.batch_size
@@ -230,6 +237,7 @@ def main(args):
         dl = get_dataloader(
             args.dataset,
             transforms=dino_transforms,
+            fo_dataset=fo_dataset,
             subset=1,
             train=False,
             batch_size=args.batch_size
@@ -252,6 +260,7 @@ def main(args):
         dl = get_dataloader(
             args.dataset,
             transforms=default_transforms(args.input_size),
+            fo_dataset=fo_dataset,
             subset=1,
             train=False, batch_size=args.batch_size
         )
@@ -272,6 +281,7 @@ def main(args):
         dl = get_dataloader(
             args.dataset,
             subset=-1,
+            fo_dataset=fo_dataset,
             train=False, batch_size=args.batch_size
         )
         t_sne(model, dl)

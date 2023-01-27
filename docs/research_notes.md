@@ -411,6 +411,18 @@ working on data-preprocessing
 
 fiftyone integration testing
 
+## 21.01.2023
 
+made first training run with fiftyone integration, only KNN 0.05 
 
+## 25.01.2023
 
+debugging data preprocessing steps, trying to find out why performance in inital run was so bad
+
+-> probably because of `local_crop_input_factor=2` and different `crop_scale` that was to small or to large
+
+retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`, same as in DINO for mobilenet paper
+otherwise same configuration
+-[ ]  maybe also add labels to tSNE plot?
+-[ ] test different augmentations for IR images!
+-[ ] implement dataloading for 16bit images!
