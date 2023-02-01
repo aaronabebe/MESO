@@ -433,6 +433,10 @@ debugging data preprocessing steps, trying to find out why performance in inital
 retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`, same as in DINO for mobilenet paper
 otherwise same configuration
 
--[ ] maybe also add labels to tSNE plot?
+-[x] maybe also add labels to tSNE plot?
 -[ ] test different augmentations for IR images!
 -[ ] implement dataloading for 16bit images!
+-[ ] try out linear finetuning for pretrained convnext/dino
+-[ ] implement contrastive loss
+- [ ] implement dataloader for contrastive
+- [ ] check dataset norm std/mean

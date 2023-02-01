@@ -31,6 +31,9 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
     :return:
     """
     model = get_model(name, **kwargs)
+    if 'vit_' not in name:
+        model.fc = nn.Identity()
+        model.head = nn.Identity()
 
     if not path_override:
         if load_remote:

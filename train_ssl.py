@@ -295,7 +295,7 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
             orig, attentions = grad_cam(model.backbone, args.model, (example_viz_img,), plot=False,
                                         path=output_dir)
 
-        tsne_fig = t_sne(model.backbone, val_loader_plain, plot=False, path=output_dir)
+        tsne_fig = t_sne(args, model.backbone, val_loader_plain, plot=False, path=output_dir)
         if args.wandb:
             wandb.log({f'{prefix}_grads': [wandb.Image(img) for img in attentions]}, step=n_steps)
             wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)

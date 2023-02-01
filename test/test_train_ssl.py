@@ -52,17 +52,19 @@ def test_mobilevit_fashion_mnist():
 
 def get_base_test_args():
     return argparse.Namespace(
-        batch_size=1,
+        batch_size=17,
         ckpt_path=None,
         clip_grad=3.0,
         compare=None,
-        train_subset=5,
-        test_subset=5,
+        train_subset=34,
+        test_subset=34,
         device='cpu',
         epochs=1,
         eval=True,
         freeze_last_layer=1,
         global_crops_scale=(0.7, 1.0),
+        local_crop_input_factor=1,
+        norm_last_layer=False,
         input_channels=3,
         input_size=32,
         learning_rate=0.0001,

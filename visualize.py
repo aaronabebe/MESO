@@ -11,7 +11,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
-from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std
+from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std, get_class_labels
 from fo_utils import get_dataset
 from models.models import get_eval_model
 from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings
@@ -75,15 +75,28 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
 
 @torch.no_grad()
-def t_sne(model, data_loader, plot=True, path=None):
+def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
     """
     Visualize model reasoning via t-SNE
     """
     embs, _, labels = compute_embeddings(model, data_loader)
-    fig = plt.figure()
+
+    fig, ax = plt.subplots()
     tsne = TSNE(n_components=2, random_state=123, verbose=1 if plot else 0, init='pca', learning_rate='auto')
     z = tsne.fit_transform(embs)
-    plt.scatter(z[:, 0], z[:, 1], c=labels)
+
+    class_names = get_class_labels(args.dataset)
+
+    for i, label in enumerate(class_names):
+        z_i = z[labels == i]
+        if class_mean:
+            z_i = np.mean(z_i, axis=0)
+            ax.scatter(z_i[0], z_i[1], label=label, s=100)
+        else:
+            ax.scatter(z_i[:, 0], z_i[:, 1], label=label, alpha=0.6)
+
+    ax.legend(loc="upper right")
+    ax.grid(True)
 
     if not path:
         path = f"./plots/tsne"
@@ -284,7 +297,7 @@ def main(args):
             fo_dataset=fo_dataset,
             train=False, batch_size=args.batch_size
         )
-        t_sne(model, dl)
+        t_sne(args, model, dl)
     else:
         raise NotImplementedError(f'Visualization {args.visualize} not implemented.')
 

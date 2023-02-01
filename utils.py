@@ -1,4 +1,5 @@
 import argparse
+import tqdm
 import glob
 import os
 import random
@@ -28,6 +29,17 @@ CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
     'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
     'spatter', 'speckle_noise', 'zoom_blur'
+)
+
+FIFTYONE_LABELS = (
+    'ALGAE', 'BOAT', 'BOAT_WITHOUT_SAILS', 'CONSTRUCTION', 'CONTAINER_SHIP', 'CRUISE_SHIP', 'FAR_AWAY_OBJECT',
+    'FISHING_SHIP', 'FLOTSAM', 'HARBOUR_BUOY', 'LEISURE_VEHICLE', 'MARITIME_VEHICLE', 'MOTORBOAT', 'OBJECT_REFLECTION',
+    'SAILING_BOAT', 'SAILING_BOAT_WITH_CLOSED_SAILS', 'SAILING_BOAT_WITH_OPEN_SAILS', 'SHIP', 'SUN_REFLECTION',
+    'UNKNOWN', 'WATERTRACK'
+)
+
+FASHION_MNIST_LABELS = (
+    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
 )
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
@@ -244,7 +256,7 @@ def compute_embeddings(backbone, data_loader):
     imgs_l = []
     labels = []
 
-    for img, y in data_loader:
+    for img, y in tqdm.tqdm(data_loader, leave=False, desc='Computing embs'):
         img = img.to(device)
         embs_l.append(backbone(img).detach().cpu())
         imgs_l.append(((img * CIFAR10_STD[1]) + CIFAR10_MEAN[1]).cpu())  # undo norm
@@ -253,5 +265,6 @@ def compute_embeddings(backbone, data_loader):
 
     embs = torch.cat(embs_l, dim=0)
     imgs = torch.cat(imgs_l, dim=0)
+    labels = np.array(labels)
 
     return embs, imgs, labels

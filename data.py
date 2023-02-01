@@ -11,7 +11,8 @@ from torchvision.transforms import InterpolationMode
 
 from fo_utils import GROUND_TRUTH_LABEL, get_dataset
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
-    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, SAILING_STD, SAILING_MEAN
+    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, SAILING_STD, SAILING_MEAN, CIFAR10_LABELS, FIFTYONE_LABELS, \
+    FASHION_MNIST_LABELS
 
 
 def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = None, train: bool = True,
@@ -20,6 +21,9 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
     Returns the dataloader for a given dataset.
     :return:
     """
+    if name != 'fiftyone' and 'fo_dataset' in kwargs:
+        del kwargs['fo_dataset']
+
     if name == 'cifar10':
         return _get_cifar10(train, transforms, num_workers, subset, **kwargs)
     elif name == 'cifar10-c':
@@ -31,6 +35,18 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
     elif name == 'fiftyone':
         return _get_fifty_one(transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
+
+
+def get_class_labels(dataset_name):
+    if dataset_name == 'cifar10':
+        return CIFAR10_LABELS
+    elif dataset_name == 'mnist':
+        return list(range(10))
+    elif dataset_name == 'fashion-mnist':
+        return FASHION_MNIST_LABELS
+    elif dataset_name == 'fiftyone':
+        return FIFTYONE_LABELS
+    raise NotImplementedError(f'No such dataset: {dataset_name}')
 
 
 def get_mean_std(dataset):
@@ -79,7 +95,7 @@ def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_work
     if subset > 0:
         trainset = Subset(trainset, range(0, subset))
     return torch.utils.data.DataLoader(
-        trainset, shuffle=True, num_workers=num_workers #, **kwargs
+        trainset, shuffle=True, num_workers=num_workers, **kwargs
     )
 
 
@@ -177,8 +193,6 @@ class DinoIRTransforms:
 
     def __call__(self, x):
         return x
-
-
 
 
 class DinoTransforms:
