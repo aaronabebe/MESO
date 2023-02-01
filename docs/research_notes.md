@@ -413,7 +413,16 @@ fiftyone integration testing
 
 ## 21.01.2023
 
-made first training run with fiftyone integration, only KNN 0.05 
+made first training run with fiftyone integration, only KNN 0.05
+
+## 23.01.2023
+
+checking out first training results, when only training on detection boxes of sailing boats
+-> kNN accuracy of 5%, so doesnt look correct yet
+
+should i also add segmentation evaluation? and not only linear evaluation? 
+also try out to integrate dino pre-trained feature weights and convnext with pre-trained feature weights
+
 
 ## 25.01.2023
 
@@ -423,6 +432,7 @@ debugging data preprocessing steps, trying to find out why performance in inital
 
 retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`, same as in DINO for mobilenet paper
 otherwise same configuration
--[ ]  maybe also add labels to tSNE plot?
+
+-[ ] maybe also add labels to tSNE plot?
 -[ ] test different augmentations for IR images!
 -[ ] implement dataloading for 16bit images!
