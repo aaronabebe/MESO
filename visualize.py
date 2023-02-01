@@ -14,7 +14,7 @@ from torch.nn import functional as F
 from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std, get_class_labels
 from fo_utils import get_dataset
 from models.models import get_eval_model
-from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings
+from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings, fix_seeds
 
 
 def grad_cam(model, model_name, data, plot=True, path=None):
@@ -173,12 +173,13 @@ def dino_attention(models, patch_size, data, plot=True, path=None):
 
 
 @torch.no_grad()
-def dino_augmentations(data):
+def dino_augmentations(args, data):
     """
     Visualize the augmentations used in the DINO paper. Similarly to
     https://github.com/jankrepl/mildlyoverfitted/blob/master/github_adventures/dino/visualize_augmentations.ipynb
     """
 
+    mean, std = get_mean_std(args.dataset)
     data = data[0]
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]) - 1)
@@ -188,17 +189,19 @@ def dino_augmentations(data):
     fig, axs = plt.subplots(n, n, figsize=(n * 3, n * 3))
     for i, img in enumerate(cropped_images):
         ax = axs[i // n][i % n]
-        ax.imshow(reshape_for_plot(img))
+        ax.imshow(reshape_for_plot(img, mean[0], std[0]))
         ax.axis("off")
     fig.tight_layout()
     sub_dir_name = 'dino_augs'
     os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
-    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_attention.svg")
+    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_augs.svg")
     plt.show()
 
 
 def main(args):
     print(f'Visualizing {args.visualize} for {args.model} model...')
+
+    fix_seeds(args.seed)
 
     fo_dataset = None
     if args.dataset == 'fiftyone':
@@ -245,8 +248,8 @@ def main(args):
 
     elif args.visualize == 'dino_augs':
         mean, std = get_mean_std(args.dataset)
-        dino_transforms = DinoTransforms(args.input_size, args.n_local_crops, args.local_crops_scale,
-                                         args.global_crops_scale, mean=mean, std=std)
+        dino_transforms = DinoTransforms(args.input_size, args.input_channels, args.n_local_crops,
+                                         args.local_crops_scale, args.global_crops_scale, mean=mean, std=std)
         dl = get_dataloader(
             args.dataset,
             transforms=dino_transforms,
@@ -256,7 +259,7 @@ def main(args):
             batch_size=args.batch_size
         )
         data = next(iter(dl))
-        dino_augmentations(data)
+        dino_augmentations(args, data)
 
     elif args.visualize == 'grad_cam':
         model = get_eval_model(

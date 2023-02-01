@@ -215,6 +215,7 @@ def get_data_loaders(args):
     mean, std = get_mean_std(args.dataset)
     transforms = DinoTransforms(
         args.input_size,
+        args.input_channels,
         args.n_local_crops,
         args.local_crops_scale,
         args.global_crops_scale,

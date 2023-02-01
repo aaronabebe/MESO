@@ -57,7 +57,9 @@ def get_mean_std(dataset):
     elif dataset == 'fashion-mnist':
         return FASHION_MNIST_MEAN, FASHION_MNIST_STD
     elif dataset == 'fiftyone':
-        return SAILING_MEAN, SAILING_STD
+        return FASHION_MNIST_MEAN, FASHION_MNIST_STD
+        # return MNIST_MEAN, MNIST_STD
+        # return SAILING_MEAN, SAILING_STD
     raise NotImplementedError(f'No such dataset: {dataset}')
 
 
@@ -179,50 +181,41 @@ def normalize(mean, std):
     ])
 
 
-class DinoIRTransforms:
-    def __init__(self):
-        # RandomResizedCrop(224, scale=(0.2, 1.))
-        # RandomHorizontalFlip()
-        # RandomPerspective
-        # implement jitter for grayscale
-
-        # RandomGaussianBlur
-        # RandomSolarize
-        # normalize
-        pass
-
-    def __call__(self, x):
-        return x
-
-
 class DinoTransforms:
     def __init__(
-            self, input_size, local_crops_number, local_crops_scale, global_crops_scale,
+            self, input_size, input_channels, local_crops_number, local_crops_scale, global_crops_scale,
             local_crop_input_factor=2,
             mean=CIFAR10_MEAN,
             std=CIFAR10_STD
     ):
         self.local_crops_number = local_crops_number
 
+        # we want to use different transforms for the grayscaled images
+        if input_channels == 1:
+            flip_and_jitter = transforms.RandomHorizontalFlip(p=0.5)
+        else:
+            flip_and_jitter = flip_and_color_jitter()
+
         self.global_transfo1 = transforms.Compose([
             transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter(),
+            flip_and_jitter,
             random_gaussian_blur(1.0),
             normalize(mean, std),
         ])
 
         self.global_transfo2 = transforms.Compose([
             transforms.RandomResizedCrop(input_size, scale=global_crops_scale, interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter(),
+            flip_and_jitter,
             random_gaussian_blur(0.1),
-            transforms.RandomSolarize(170, p=0.2),
+            # deactivating for now since we're working with grayscale
+            # transforms.RandomSolarize(170, p=0.2),
             normalize(mean, std),
         ])
 
         self.local_transfo = transforms.Compose([
             transforms.RandomResizedCrop(input_size // local_crop_input_factor, scale=local_crops_scale,
                                          interpolation=InterpolationMode.BICUBIC),
-            flip_and_color_jitter(),
+            flip_and_jitter,
             random_gaussian_blur(p=0.5),
             normalize(mean, std),
         ])

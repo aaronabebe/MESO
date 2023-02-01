@@ -434,7 +434,7 @@ retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`
 otherwise same configuration
 
 -[x] maybe also add labels to tSNE plot?
--[ ] test different augmentations for IR images!
+-[x] test different augmentations for IR images!
 -[ ] implement dataloading for 16bit images!
 -[ ] try out linear finetuning for pretrained convnext/dino
 -[ ] implement contrastive loss

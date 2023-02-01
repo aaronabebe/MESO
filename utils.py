@@ -244,12 +244,11 @@ def grad_cam_reshape_transform(tensor, height=4, width=4):
     return result
 
 
-def reshape_for_plot(img):
-    return img.permute(1, 2, 0) * 0.5 + 0.5
+def reshape_for_plot(img, mean=0.5, std=0.5):
+    return img.permute(1, 2, 0) * std + mean
 
 
-@torch.no_grad()
-def compute_embeddings(backbone, data_loader):
+def compute_embeddings(backbone, data_loader, mean=0.5, std=0.5):
     device = next(backbone.parameters()).device
 
     embs_l = []
@@ -259,7 +258,7 @@ def compute_embeddings(backbone, data_loader):
     for img, y in tqdm.tqdm(data_loader, leave=False, desc='Computing embs'):
         img = img.to(device)
         embs_l.append(backbone(img).detach().cpu())
-        imgs_l.append(((img * CIFAR10_STD[1]) + CIFAR10_MEAN[1]).cpu())  # undo norm
+        imgs_l.append(((img * std) + mean).cpu())  # undo norm
         # labels.extend([CIFAR10_LABELS[i] for i in y.tolist()])
         labels.extend(y.tolist())
 
