@@ -49,17 +49,17 @@ See: Li, H., Xu, Z., Taylor, G., Studer, C., and Goldstein, T. (2017). Visualizi
 
 What are
 
-- [ ] few shot learning?
+- [x] few shot learning?
 - [x] representation learning?
-- [ ] zero shot?
-- [ ] depthwise conv (used in mobilenet)
-- [ ] FLOPs
-- [ ] layernorm
+- [x] zero shot?
+- [x] depthwise conv (used in mobilenet)
+- [x] FLOPs
+- [x] layernorm
 - [ ] DINO teacher centering?
 - [ ] JFT-300M
 - [ ] Inception style pre-processing
 - [ ] GPaCo/PaCo
-- [ ] t-SNE
+- [x] t-SNE
 - [ ] KL-divergence
 
 Also check out ConvNext paper and Momentum Contrast.
@@ -229,11 +229,11 @@ SAM-ViT papers uses 10% of ImageNet training set (~120.000) and resolution of 50
 
 TODOs:
 
-- [ ] eval loss landscape for pretrained ViT
-- [ ] cleanup code and push to repo
-- [ ] implement CIFAR10-C eval in pipeline
-- [ ] understand/implement code for visualizing attention maps
-- [ ] train ResNet
+- [x] eval loss landscape for pretrained ViT
+- [x] cleanup code and push to repo
+- [x] implement CIFAR10-C eval in pipeline
+- [x] understand/implement code for visualizing attention maps
+- [x] train ResNet
 
 ViT-T/8 on M1 ~1.8it/s
 ViT-T/8 on Lenovo ~3.5it/s
@@ -364,7 +364,8 @@ thinking about using fivecrop transform for DINO
 
 for the beginning only filter large detection crops as image and use those
 
-number of unique classes: 35 -> maybe i can use a reduced set of classes?
+number of unique classes: 32 -> maybe i can use a reduced set of classes?
+
 
 ```shell
 {
@@ -433,10 +434,29 @@ debugging data preprocessing steps, trying to find out why performance in inital
 retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`, same as in DINO for mobilenet paper
 otherwise same configuration
 
--[x] maybe also add labels to tSNE plot?
--[x] test different augmentations for IR images!
--[ ] implement dataloading for 16bit images!
--[ ] try out linear finetuning for pretrained convnext/dino
--[ ] implement contrastive loss
-- [ ] implement dataloader for contrastive
-- [ ] check dataset norm std/mean
+- [x] maybe also add labels to tSNE plot?
+- [x] test different augmentations for IR images!
+- [x] implement contrastive loss
+- [x] implement dataloader for contrastive
+
+- [ ] implement dataloading for 16bit images!
+- [ ] check sailing dataset norm std/mean for 16bit
+
+- [x] try out linear finetuning for pretrained convnext/dino
+
+## 15.02.2023
+
+implemented contrastive learning pipeline -> working good on cifar10, similar or better to DINO wrt to kNN accuracy
+trying out linear eval now. 
+testing linear eval with DINO pretrained ViT-Small on sailing subset
+
+- [ ] cleanup linear eval code, add visualizations
+- [x] reduce amount of classes in sailing subset from 35 -> 15 maybe?
+- [x] add check to guarantee same classes in train/val/test splits
+
+
+
+
+
+
+

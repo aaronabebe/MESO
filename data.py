@@ -9,10 +9,9 @@ from torch.utils.data import RandomSampler, Subset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
-from fo_utils import GROUND_TRUTH_LABEL, get_dataset
+from fo_utils import GROUND_TRUTH_LABEL, map_class_to_subset, SAILING_CLASSES_V1
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
-    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, SAILING_STD, SAILING_MEAN, CIFAR10_LABELS, FIFTYONE_LABELS, \
-    FASHION_MNIST_LABELS
+    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, CIFAR10_LABELS, FASHION_MNIST_LABELS
 
 
 def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = None, train: bool = True,
@@ -45,7 +44,7 @@ def get_class_labels(dataset_name):
     elif dataset_name == 'fashion-mnist':
         return FASHION_MNIST_LABELS
     elif dataset_name == 'fiftyone':
-        return FIFTYONE_LABELS
+        return SAILING_CLASSES_V1
     raise NotImplementedError(f'No such dataset: {dataset_name}')
 
 
@@ -254,14 +253,21 @@ class CIFAR10CDataset(torchvision.datasets.VisionDataset):
 
 class FiftyOneTorchDataset(torch.utils.data.Dataset):
     def __init__(self, fo_dataset, transform: torchvision.transforms = None,
-                 ground_truth_label: str = GROUND_TRUTH_LABEL):
+                 ground_truth_label: str = GROUND_TRUTH_LABEL, use_class_subset: bool = False):
         self.samples = fo_dataset
 
         self.transforms = transform
         self.img_paths = self.samples.values("filepath")
         self.ground_truth_label = ground_truth_label
+        self.use_class_subset = use_class_subset
 
-        self.classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
+        all_classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
+        if self.use_class_subset:
+            self.classes = {map_class_to_subset(c) for c in all_classes}
+        else:
+            self.classes = all_classes
+            assert len(self.classes) == len(SAILING_CLASSES_V1), "Classes are not the same"
+
         self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
 
     def __len__(self):
@@ -305,7 +311,10 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
                 if self.transforms:
                     crop = self.transforms(crop)
 
-                label = self.labels_map_rev[detection.label]
+                if self.use_class_subset:
+                    label = self.labels_map_rev[map_class_to_subset(detection.label)]
+                else:
+                    label = self.labels_map_rev[detection.label]
                 largest_crop = crop
                 largest_crop_label = label
                 largest_crop_area = detection.area

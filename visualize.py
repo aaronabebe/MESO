@@ -46,6 +46,9 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
     input_tensor = data[0][random_choice:random_choice + 1]
 
+    if not input_tensor.requires_grad:
+        input_tensor.requires_grad = True
+
     cam = GradCAM(
         model=model,
         target_layers=target_layer,
@@ -53,7 +56,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
         reshape_transform=grad_cam_reshape_transform if 'vit_' in model_name else None,
     )
     grayscale_cam = cam(input_tensor=input_tensor, targets=classifier_target)
-    input_tensor = np.transpose(input_tensor.cpu().numpy()[0], (1, 2, 0))
+    input_tensor = np.transpose(input_tensor.cpu().detach().numpy()[0], (1, 2, 0))
     ax1.imshow(input_tensor)
 
     visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True)
@@ -95,12 +98,13 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
         else:
             ax.scatter(z_i[:, 0], z_i[:, 1], label=label, alpha=0.6)
 
-    ax.legend(loc="upper right")
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     ax.grid(True)
 
     if not path:
         path = f"./plots/tsne"
 
+    fig.tight_layout()
     os.makedirs(path, exist_ok=True)
     fig.savefig(f"{path}/{time.ctime()}_tsne.svg")
 
@@ -296,7 +300,7 @@ def main(args):
         )
         dl = get_dataloader(
             args.dataset,
-            subset=-1,
+            subset=args.test_subset,
             fo_dataset=fo_dataset,
             train=False, batch_size=args.batch_size
         )

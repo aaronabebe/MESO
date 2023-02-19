@@ -6,6 +6,7 @@ import random
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -29,13 +30,6 @@ CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
     'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
     'spatter', 'speckle_noise', 'zoom_blur'
-)
-
-FIFTYONE_LABELS = (
-    'ALGAE', 'BOAT', 'BOAT_WITHOUT_SAILS', 'CONSTRUCTION', 'CONTAINER_SHIP', 'CRUISE_SHIP', 'FAR_AWAY_OBJECT',
-    'FISHING_SHIP', 'FLOTSAM', 'HARBOUR_BUOY', 'LEISURE_VEHICLE', 'MARITIME_VEHICLE', 'MOTORBOAT', 'OBJECT_REFLECTION',
-    'SAILING_BOAT', 'SAILING_BOAT_WITH_CLOSED_SAILS', 'SAILING_BOAT_WITH_OPEN_SAILS', 'SHIP', 'SUN_REFLECTION',
-    'UNKNOWN', 'WATERTRACK'
 )
 
 FASHION_MNIST_LABELS = (
@@ -121,6 +115,7 @@ def get_args() -> argparse.Namespace:
         weight decay. We use a cosine schedule for WD and using a larger decay by
         the end of training improves performance for ViTs.""")
 
+    parser.add_argument("--method", type=str, default='simclr', choices=['dino', 'supcon', 'simclr'])
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
@@ -138,7 +133,7 @@ def fix_seeds(seed):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.benchmark = True
     np.random.seed(seed)
     random.seed(seed)
 
@@ -267,3 +262,13 @@ def compute_embeddings(backbone, data_loader, mean=0.5, std=0.5):
     labels = np.array(labels)
 
     return embs, imgs, labels
+
+
+def remove_head(backbone):
+    if hasattr(backbone, "fc") and type(backbone.fc) != nn.Identity:
+        backbone.fc = nn.Identity()
+    if hasattr(backbone, "head") and type(backbone.head) != nn.Identity:
+        if hasattr(backbone.head, "fc"):
+            backbone.head.fc = nn.Identity()
+        else:
+            backbone.head = nn.Identity()

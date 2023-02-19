@@ -1,5 +1,4 @@
 import math
-import math
 import os
 import sys
 
@@ -7,8 +6,8 @@ import torch
 import tqdm
 
 import wandb
-from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
-from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
+from contrastive_utils import SupConLoss, ContrastiveHeadWrapper
+from dino_utils import dino_cosine_scheduler, MLPHead
 from models.models import get_model
 from train_utils import get_data_loaders, eval_model, get_optimizer, get_writer
 from utils import get_args, fix_seeds, get_model_embed_dim
@@ -18,10 +17,10 @@ def main(args):
     device = torch.device(args.device)
 
     fix_seeds(args.seed)
-    writer, output_dir = get_writer(args, sub_dir='dino')
+    writer, output_dir = get_writer(args, sub_dir='contrastive')
 
     if args.wandb:
-        wandb.init(project="dino", config=vars(args))
+        wandb.init(project="contrastive", config=vars(args))
         wandb.watch_called = False
 
     train_loader, train_loader_plain, val_loader_plain, val_loader_plain_subset = get_data_loaders(args)
@@ -29,49 +28,27 @@ def main(args):
     example_viz_img, _ = next(iter(val_loader_plain_subset))
     example_viz_img = example_viz_img.to(device)
 
-    student = get_model(
+    model = get_model(
         args.model,
         in_chans=args.input_channels,
         num_classes=args.num_classes,
         patch_size=args.patch_size if 'vit_' in args.model else None,
         img_size=args.input_size if 'vit_' in args.model else None
     )
+    embed_dim = get_model_embed_dim(model, args.model)
 
-    embed_dim = get_model_embed_dim(student, args.model)
+    model = ContrastiveHeadWrapper(model,
+                                   MLPHead(in_dim=embed_dim, out_dim=args.out_dim,
+                                           norm_last_layer=args.norm_last_layer))
+    model = model.to(device)
 
-    student = MultiCropWrapper(student,
-                               MLPHead(in_dim=embed_dim, out_dim=args.out_dim, norm_last_layer=args.norm_last_layer))
-    student = student.to(device)
-
-    teacher = get_model(
-        args.model,
-        in_chans=args.input_channels,
-        num_classes=args.num_classes,
-        patch_size=args.patch_size if 'vit_' in args.model else None,
-        img_size=args.input_size if 'vit_' in args.model else None
-    )
-    teacher = MultiCropWrapper(teacher,
-                               MLPHead(in_dim=embed_dim, out_dim=args.out_dim, norm_last_layer=args.norm_last_layer))
-    teacher = teacher.to(device)
-
-    # teacher gets student weights and doesnt learn
-    teacher.load_state_dict(student.state_dict())
-    for param in teacher.parameters():
-        param.requires_grad = False
-    print("=> Dataloaders, student and teacher ready.")
+    print("=> Dataloaders, model ready.")
     print(
-        "=> Number of parameters of student: {:.2f}M".format(sum(p.numel() for p in student.parameters()) / 1000000.0))
+        "=> Number of parameters of model: {:.2f}M".format(sum(p.numel() for p in model.parameters()) / 1000000.0))
 
-    dino_loss = DINOLoss(
-        args.out_dim,
-        args.n_local_crops + 2,
-        args.warmup_teacher_temp,
-        args.teacher_temp,
-        args.warmup_teacher_temp_epochs,
-        args.epochs
-    ).to(device)
+    loss_function = SupConLoss().to(device)
 
-    params = get_params_groups(student)
+    params = model.parameters()
     optim = get_optimizer(args, params)
 
     lr_schedule = dino_cosine_scheduler(
@@ -80,14 +57,6 @@ def main(args):
         args.epochs, len(train_loader),
         warmup_epochs=args.warmup_epochs,
     )
-    wd_schedule = dino_cosine_scheduler(
-        args.weight_decay,
-        args.weight_decay_end,
-        args.epochs, len(train_loader),
-    )
-
-    # momentum parameter is increased to 1. during training with a cosine schedule
-    momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
     print("=> Loss, optimizer and schedulers ready.")
 
     n_batches = len(train_loader.dataset) // args.batch_size
@@ -96,7 +65,8 @@ def main(args):
 
     if args.resume:
         if args.wandb:
-            artifact = wandb.use_artifact(f'mcaaroni/dino/{args.model}_{args.dataset}_model:latest', type='model')
+            artifact = wandb.use_artifact(f'mcaaroni/contrastive/{args.model}_{args.dataset}_model:latest',
+                                          type='model')
             path = artifact.download()
             path = f'{path}/best.pth'
         else:
@@ -105,10 +75,9 @@ def main(args):
         if os.path.isfile(path):
             print(f"=> loading checkpoint '{path}'")
             checkpoint = torch.load(path, map_location=device)
-            student.load_state_dict(checkpoint['student'])
-            teacher.load_state_dict(checkpoint['teacher'])
+            model.load_state_dict(checkpoint['teacher'])
             optim.load_state_dict(checkpoint['optimizer'])
-            dino_loss.load_state_dict(checkpoint['dino_loss'])
+            loss_function.load_state_dict(checkpoint['loss'])
             start_epoch = checkpoint['epoch']
             print(f"=> Resuming from epoch {start_epoch}")
         else:
@@ -118,18 +87,18 @@ def main(args):
 
     for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
         if args.eval:
-            student.eval()
-            teacher_knn_acc = eval_model(args, example_viz_img, n_steps, output_dir, student.backbone,
-                                         train_loader_plain, val_loader_plain, writer, wandb, epoch, prefix='teacher')
+            model.eval()
+
+            teacher_knn_acc = eval_model(args, example_viz_img, n_steps, output_dir, model.backbone, train_loader_plain,
+                                         val_loader_plain, writer, wandb, epoch, prefix='teacher')
 
             if teacher_knn_acc > best_acc:
                 save_dict = {
-                    'student': student.state_dict(),
-                    'teacher': teacher.state_dict(),
+                    'teacher': model.state_dict(),
                     'optimizer': optim.state_dict(),
                     'epoch': epoch + 1,
                     'args': args,
-                    'dino_loss': dino_loss.state_dict(),
+                    'loss': loss_function.state_dict(),
                 }
                 save_path = f'{output_dir}/best.pth'
                 torch.save(save_dict, save_path)
@@ -139,22 +108,29 @@ def main(args):
                     wandb.log_artifact(artifact)
 
                 best_acc = teacher_knn_acc
-            student.train()
+            model.train()
 
         progress_bar = tqdm.auto.tqdm(enumerate(train_loader), position=1, leave=False, total=n_batches)
-        for it, (images, _) in progress_bar:
+        for it, (images, labels) in progress_bar:
             it = len(train_loader) * epoch + it  # global training iteration
             for i, param_group in enumerate(optim.param_groups):
                 param_group["lr"] = lr_schedule[it]
-                if i == 0:  # only the first group is regularized
-                    param_group["weight_decay"] = wd_schedule[it]
 
-            images = [img.to(device) for img in images]
+            # TODO clean this up and move to wrapper class
+            bsz = labels.shape[0]
+            images = torch.cat([images[i] for i in range(args.n_local_crops + 2)], dim=0)
+            images = images.to(device)
 
-            teacher_outputs = teacher(images[:2])
-            student_outputs = student(images)
+            outputs = model(images)
+            splits = torch.split(outputs, bsz, dim=0)
+            outputs = torch.cat([split.unsqueeze(1) for split in splits], dim=1)
 
-            loss = dino_loss(student_outputs, teacher_outputs, epoch)
+            if args.method == 'simclr':
+                loss = loss_function(outputs)
+            elif args.method == 'supcon':
+                loss = loss_function(outputs, labels.to(device))
+            else:
+                raise ValueError(f'Unknown method: {args.method}')
 
             if not math.isfinite(loss.item()):
                 print(f"Loss is {loss.item()}, stopping training")
@@ -162,28 +138,19 @@ def main(args):
 
             optim.zero_grad()
             loss.backward()
-            cancel_gradients_last_layer(epoch, student, args.freeze_last_layer)
-            clip_gradients(student, args.clip_grad)
             optim.step()
-
-            with torch.no_grad():
-                m = momentum_schedule[it]
-                for param_q, param_k in zip(student.parameters(), teacher.parameters()):
-                    param_k.data.mul(m).add_((1 - m) * param_q.detach().data)
 
             writer.add_scalar("train_loss", loss.item(), n_steps)
             writer.add_scalar("epoch", epoch, n_steps)
-            writer.add_scalar("teacher_momentum", m, n_steps)
             writer.add_scalar("lr", optim.param_groups[0]['lr'], n_steps)
             writer.add_scalar("weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
-            progress_bar.set_description(f"Loss: {loss.item():.2f}")
+            progress_bar.set_description(f"Loss {loss.item():.3f}")
             if args.wandb:
                 wandb.log({
                     "epoch": epoch,
                     "train_loss": loss.item(),
                     "lr": optim.param_groups[0]['lr'],
                     "weight_decay": optim.param_groups[0]['weight_decay'],
-                    "teacher_momentum": m,
                 }, step=n_steps)
             n_steps += 1
 

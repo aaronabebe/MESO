@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+from utils import remove_head
+
 
 class MultiCropWrapper(nn.Module):
     """
@@ -19,15 +21,7 @@ class MultiCropWrapper(nn.Module):
     def __init__(self, backbone, mlphead):
         super(MultiCropWrapper, self).__init__()
         # disable layers dedicated to ImageNet labels classification
-        if hasattr(backbone, "fc") and type(backbone.fc) != nn.Identity:
-            backbone.fc = nn.Identity()
-
-        if hasattr(backbone, "head") and type(backbone.head) != nn.Identity:
-            if hasattr(backbone.head, "fc"):
-                backbone.head.fc = nn.Identity()
-            else:
-                backbone.head = nn.Identity()
-
+        remove_head(backbone)
         self.backbone = backbone
         self.mlphead = mlphead
 
