@@ -1,10 +1,12 @@
 import argparse
+import tqdm
 import glob
 import os
 import random
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -20,10 +22,18 @@ MNIST_STD = (0.3081,)
 FASHION_MNIST_MEAN = (0.2860,)
 FASHION_MNIST_STD = (0.3530,)
 
+# SEE experiments/fo_experiments.py for more calculations
+SAILING_MEAN = (0.4712,)
+SAILING_STD = (0.0447,)
+
 CIFAR_10_CORRUPTIONS = (
     'brightness', 'contrast', 'defocus_blur', 'elastic_transform', 'fog', 'frost', 'gaussian_blur', 'gaussian_noise',
     'glass_blur', 'impulse_noise', 'jpeg_compression', 'motion_blur', 'pixelate', 'saturate', 'shot_noise', 'snow',
     'spatter', 'speckle_noise', 'zoom_blur'
+)
+
+FASHION_MNIST_LABELS = (
+    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
 )
 
 # https://www.cs.toronto.edu/~kriz/cifar.html
@@ -51,7 +61,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
     parser.add_argument("--train_subset", type=int, default=-1, help="Subset of dataset for training.")
-    parser.add_argument("--test_subset", type=int, default=3000,
+    parser.add_argument("--test_subset", type=int, default=-1,
                         help="Subset of dataset for faster testing and evaluation (Default 2000)")
     parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
@@ -105,6 +115,7 @@ def get_args() -> argparse.Namespace:
         weight decay. We use a cosine schedule for WD and using a larger decay by
         the end of training improves performance for ViTs.""")
 
+    parser.add_argument("--method", type=str, default='simclr', choices=['dino', 'supcon', 'simclr'])
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
     parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
@@ -122,7 +133,7 @@ def fix_seeds(seed):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.benchmark = True
     np.random.seed(seed)
     random.seed(seed)
 
@@ -228,26 +239,36 @@ def grad_cam_reshape_transform(tensor, height=4, width=4):
     return result
 
 
-def reshape_for_plot(img):
-    return img.permute(1, 2, 0) * 0.5 + 0.5
+def reshape_for_plot(img, mean=0.5, std=0.5):
+    return img.permute(1, 2, 0) * std + mean
 
 
-@torch.no_grad()
-def compute_embeddings(backbone, data_loader):
+def compute_embeddings(backbone, data_loader, mean=0.5, std=0.5):
     device = next(backbone.parameters()).device
 
     embs_l = []
     imgs_l = []
     labels = []
 
-    for img, y in data_loader:
+    for img, y in tqdm.tqdm(data_loader, leave=False, desc='Computing embs'):
         img = img.to(device)
         embs_l.append(backbone(img).detach().cpu())
-        imgs_l.append(((img * CIFAR10_STD[1]) + CIFAR10_MEAN[1]).cpu())  # undo norm
+        imgs_l.append(((img * std) + mean).cpu())  # undo norm
         # labels.extend([CIFAR10_LABELS[i] for i in y.tolist()])
         labels.extend(y.tolist())
 
     embs = torch.cat(embs_l, dim=0)
     imgs = torch.cat(imgs_l, dim=0)
+    labels = np.array(labels)
 
     return embs, imgs, labels
+
+
+def remove_head(backbone):
+    if hasattr(backbone, "fc") and type(backbone.fc) != nn.Identity:
+        backbone.fc = nn.Identity()
+    if hasattr(backbone, "head") and type(backbone.head) != nn.Identity:
+        if hasattr(backbone.head, "fc"):
+            backbone.head.fc = nn.Identity()
+        else:
+            backbone.head = nn.Identity()

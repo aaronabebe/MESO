@@ -1,9 +1,10 @@
-import torch
-import torch.nn as nn
 import math
 from functools import partial
-from torch.nn.init import trunc_normal_
+
+import torch
+import torch.nn as nn
 from timm.models.layers import DropPath
+from torch.nn.init import trunc_normal_
 
 
 class Mlp(nn.Module):
@@ -205,13 +206,6 @@ def vit_tiny(patch_size=16, **kwargs):
 def vit_cifar(patch_size=4, **kwargs):
     model = VisionTransformer(
         img_size=[32], patch_size=patch_size, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
-        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
-    return model
-
-
-def vit_small(patch_size=16, **kwargs):
-    model = VisionTransformer(
-        patch_size=patch_size, embed_dim=384, depth=12, num_heads=6, mlp_ratio=4,
         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 

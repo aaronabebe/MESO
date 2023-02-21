@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import tqdm
 from sklearn.metrics import accuracy_score
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -19,7 +20,7 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
         "y_val": [],
     }
 
-    for name, data_loader in data_loaders.items():
+    for name, data_loader in tqdm.auto.tqdm(data_loaders.items(), position=2, leave=False, desc=" kNN eval"):
         for imgs, y in data_loader:
             imgs = imgs.to(device)
             lists[f"X_{name}"].append(backbone(imgs).detach().cpu().numpy())

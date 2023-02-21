@@ -334,7 +334,6 @@ implements warmup and proper scheduling, loss looks better now for short trainin
 batch sizes
 starting on convnext implementation now
 
-
 ## 23.11.2022
 
 implemented convnext, training now, also implemented official attention visualization, which looks very different
@@ -347,11 +346,11 @@ vincze wegen tu hardware schreiben
 
 ## 24.11.2022
 
-setup wandb to log 
-testing different training configurations and datasets for a few epochs in colab to see if everything seems to work correctly
+setup wandb to log
+testing different training configurations and datasets for a few epochs in colab to see if everything seems to work
+correctly
 
 checking andrej karpathys training recipe for reference [link to his blog](http://karpathy.github.io/2019/04/25/recipe/)
-
 
 ## 03.12.2022
 
@@ -392,6 +391,105 @@ i will also try to integrate contrastive loss and SimCLR into the training pipel
 
 for the CIFAR10 models, im still missing linear evaluation on the best ones, and then evaluation on CIFAR10-C
 prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100 
+
+## 18.01.2023
+
+getting started with fiftyone integration, exploring dataset
+thinking about using fivecrop transform for DINO
+
+for the beginning only filter large detection crops as image and use those
+
+number of unique classes: 32 -> maybe i can use a reduced set of classes?
+
+
+```shell
+{
+    'ALGAE': 1,
+    'BIRD': 65,
+    'BOAT': 262,
+    'BOAT_WITHOUT_SAILS': 456,
+    'BUOY': 319,
+    'CONSTRUCTION': 207,
+    'CONTAINER': 51,
+    'CONTAINER_SHIP': 267,
+    'CRUISE_SHIP': 108,
+    'DOLPHIN': 2,
+    'FAR_AWAY_OBJECT': 4650,
+    'FISHING_BUOY': 90,
+    'FISHING_SHIP': 17,
+    'FLOTSAM': 261,
+    'HARBOUR_BUOY': 94,
+    'HORIZON': 1,
+    'HUMAN': 9,
+    'HUMAN_IN_WATER': 11,
+    'HUMAN_ON_BOARD': 173,
+    'KAYAK': 3,
+    'LEISURE_VEHICLE': 23,
+    'MARITIME_VEHICLE': 936,
+    'MOTORBOAT': 408,
+    'OBJECT_REFLECTION': 30,
+    'SAILING_BOAT': 534,
+    'SAILING_BOAT_WITH_CLOSED_SAILS': 576,
+    'SAILING_BOAT_WITH_OPEN_SAILS': 528,
+    'SEAGULL': 3,
+    'SHIP': 347,
+    'SUN_REFLECTION': 11,
+    'UNKNOWN': 5,
+    'WATERTRACK': 105
+}
+```
+
+## 19.01.2023
+
+working on data-preprocessing
+
+## 20.01.2023
+
+fiftyone integration testing
+
+## 21.01.2023
+
+made first training run with fiftyone integration, only KNN 0.05
+
+## 23.01.2023
+
+checking out first training results, when only training on detection boxes of sailing boats
+-> kNN accuracy of 5%, so doesnt look correct yet
+
+should i also add segmentation evaluation? and not only linear evaluation? 
+also try out to integrate dino pre-trained feature weights and convnext with pre-trained feature weights
+
+
+## 25.01.2023
+
+debugging data preprocessing steps, trying to find out why performance in inital run was so bad
+
+-> probably because of `local_crop_input_factor=2` and different `crop_scale` that was to small or to large
+
+retrying with `local_crop_input_factor=1` and `crop_scale` in range `[0.3, 0.4]`, same as in DINO for mobilenet paper
+otherwise same configuration
+
+- [x] maybe also add labels to tSNE plot?
+- [x] test different augmentations for IR images!
+- [x] implement contrastive loss
+- [x] implement dataloader for contrastive
+
+- [ ] implement dataloading for 16bit images!
+- [ ] check sailing dataset norm std/mean for 16bit
+
+- [x] try out linear finetuning for pretrained convnext/dino
+
+## 15.02.2023
+
+implemented contrastive learning pipeline -> working good on cifar10, similar or better to DINO wrt to kNN accuracy
+trying out linear eval now. 
+testing linear eval with DINO pretrained ViT-Small on sailing subset
+
+- [ ] cleanup linear eval code, add visualizations
+- [x] reduce amount of classes in sailing subset from 35 -> 15 maybe?
+- [x] add check to guarantee same classes in train/val/test splits
+
+
 
 
 

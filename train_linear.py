@@ -1,44 +1,45 @@
 import argparse
-import json
-import os
-import pprint
-import time
 
 import torch
 import torch.nn as nn
 import tqdm
-import wandb
-from torch.utils.tensorboard import SummaryWriter
 
-from models.models import get_eval_model
-from utils import get_args, get_model_embed_dim, TENSORBOARD_LOG_DIR, fix_seeds, get_experiment_name, eval_accuracy
+import wandb
 from data import get_dataloader
+from fo_utils import get_dataset
+from models.models import get_eval_model
+from train_utils import get_writer
+from utils import get_args, get_model_embed_dim, fix_seeds, eval_accuracy
+
+N_LAST_BLOCKS_VIT_SMALL = 4
 
 
 def main(args: argparse.Namespace):
-    pprint.pprint(vars(args))
-
-    fix_seeds(args.seed)
     device = torch.device(args.device)
 
-    experiment_name = get_experiment_name(args)
-    os.makedirs(f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()[:10]}', exist_ok=True)
-    output_dir = f'{TENSORBOARD_LOG_DIR}/dino/{time.ctime()[:10]}/{experiment_name}'
-    writer = SummaryWriter(output_dir)
-    writer.add_text("args", json.dumps(vars(args)))
+    fix_seeds(args.seed)
+    writer, output_dir = get_writer(args, sub_dir='linear')
 
+    if args.wandb:
+        wandb.init(project="linear", config=vars(args))
+        wandb.watch_called = False
+
+    pretrained = True
     model = get_eval_model(
         args.model,
         args.device,
         args.dataset,
         path_override=args.ckpt_path,
         in_chans=args.input_channels,
-        num_classes=args.num_classes,
-        patch_size=args.patch_size if 'vit_' in args.model else None,
+        num_classes=0,
+        # patch_size=args.patch_size if 'vit_' in args.model else None,
         img_size=args.input_size if 'vit_' in args.model else None,
-        load_remote=args.wandb
+        load_remote=args.wandb,
+        pretrained=pretrained,
     )
+
     embed_dim = get_model_embed_dim(model, args.model)
+
     if hasattr(model, "fc") and type(model.fc) != nn.Identity:
         model.fc = nn.Identity()
 
@@ -47,25 +48,53 @@ def main(args: argparse.Namespace):
             model.head.fc = nn.Identity()
         else:
             model.head = nn.Identity()
+    # TODO: make this a function
 
     model.to(device)
+    if pretrained:
+        url = 'https://dl.fbaipublicfiles.com/dino/dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth'
+        state_dict = torch.hub.load_state_dict_from_url(url, map_location=device)
+        model.load_state_dict(state_dict)
 
-    # TODO test to enable this, requires more memory but should be faster
-    # cudnn.benchmark = True
+        # replace 3 channels with 1 channel
+        if args.dataset == 'fiftyone':
+            # only using first channel, try out other channels
+            model.patch_embed.proj.weight = nn.Parameter(model.patch_embed.proj.weight[:, 0:1, :, :])
 
-    linear_classifier = LinearClassifier(embed_dim)
+    linear_classifier = LinearClassifier(embed_dim * N_LAST_BLOCKS_VIT_SMALL, num_labels=args.num_classes)
     linear_classifier = linear_classifier.to(device)
 
-    train_loader = get_dataloader(
-        args.dataset, train=True,
-        batch_size=args.batch_size,
-        subset=-1
-    )
-    val_loader = get_dataloader(
-        args.dataset, train=False,
-        batch_size=args.batch_size,
-        subset=-1
-    )
+    if args.dataset == 'fiftyone':
+        train_data, val_data = get_dataset()
+        train_loader = get_dataloader(
+            args.dataset,
+            fo_dataset=train_data,
+            num_workers=args.num_workers,
+            train=True,
+            batch_size=args.batch_size,
+            subset=-1
+        )
+        val_loader = get_dataloader(
+            args.dataset,
+            fo_dataset=val_data,
+            num_workers=args.num_workers,
+            train=False,
+            batch_size=args.batch_size,
+            subset=-1
+        )
+    else:
+        train_loader = get_dataloader(
+            args.dataset, train=True,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=-1
+        )
+        val_loader = get_dataloader(
+            args.dataset, train=False,
+            num_workers=args.num_workers,
+            batch_size=args.batch_size,
+            subset=-1
+        )
 
     optimizer = torch.optim.SGD(
         linear_classifier.parameters(),
@@ -73,27 +102,28 @@ def main(args: argparse.Namespace):
         momentum=0.9,
         weight_decay=0,  # we do not apply weight decay
     )
+
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, args.epochs, eta_min=0)
 
     n_batches = len(train_loader.dataset) // args.batch_size
-    print('n_batches', n_batches)
     best_acc = 0
     start_epoch = 0
 
     # TODO add resume from checkpoint
 
     n_steps = start_epoch * args.batch_size
-    for epoch in tqdm.auto.trange(start_epoch, args.epochs):
+    for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
         if args.eval:
             linear_classifier.eval()
             with torch.no_grad():
                 acc1s, acc5s = [], []
-                for it, (images, labels) in tqdm.autonotebook.tqdm(enumerate(val_loader), desc="val batches ", position=2,
-                                                      leave=False):
+                progress_bar = tqdm.auto.tqdm(enumerate(val_loader), desc=" val batches", position=1, leave=False,
+                                              total=len(val_loader.dataset) // args.batch_size)
+                for it, (images, labels) in progress_bar:
                     images, labels = images.to(device), labels.to(device)
                     with torch.no_grad():
                         if "vit" in args.model:
-                            intermediate_output = model.get_intermediate_layers(images, 3)
+                            intermediate_output = model.get_intermediate_layers(images, N_LAST_BLOCKS_VIT_SMALL)
                             output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                         else:
                             output = model(images)
@@ -114,7 +144,7 @@ def main(args: argparse.Namespace):
                 acc1 = torch.mean(torch.stack(acc1s))
                 acc5 = torch.mean(torch.stack(acc5s))
 
-                print(f"val acc1: {acc1:.2f} acc5: {acc5:.2f}")
+                print(f"acc1: {acc1:.2f} acc5: {acc5:.2f}")
 
                 if acc1 > best_acc:
                     best_acc = acc1
@@ -137,12 +167,12 @@ def main(args: argparse.Namespace):
 
             linear_classifier.train()
 
-        for it, (images, labels) in tqdm.tqdm(enumerate(train_loader), total=n_batches, desc=" batches", position=1,
-                                              leave=False):
+        progress_bar = tqdm.auto.tqdm(enumerate(train_loader), position=1, leave=False, total=n_batches)
+        for it, (images, labels) in progress_bar:
             images, labels = images.to(device), labels.to(device)
             with torch.no_grad():
                 if "vit" in args.model:
-                    intermediate_output = model.get_intermediate_layers(images, 3)
+                    intermediate_output = model.get_intermediate_layers(images, N_LAST_BLOCKS_VIT_SMALL)
                     output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                 else:
                     output = model(images)
@@ -155,6 +185,7 @@ def main(args: argparse.Namespace):
             writer.add_scalar("train_loss", loss.item(), n_steps)
             writer.add_scalar("epoch", epoch, n_steps)
             writer.add_scalar("lr", optimizer.param_groups[0]['lr'], n_steps)
+            progress_bar.set_description(f"loss: {loss.item():.2f}")
             if args.wandb:
                 wandb.log({
                     "epoch": epoch,
