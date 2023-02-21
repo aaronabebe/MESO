@@ -116,7 +116,7 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
 
 
 @torch.no_grad()
-def dino_attention(models, patch_size, data, plot=True, path=None):
+def dino_attention(models, patch_size, data, plot=True, path=None, sample_size=2):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -125,54 +125,55 @@ def dino_attention(models, patch_size, data, plot=True, path=None):
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]) - 1)
 
-    # use only one image for now
-    img = data[0][random_choice]
+    imgs = data[0][random_choice:random_choice + sample_size]
 
-    patch_size = patch_size
-    # make the image divisible by the patch size
-    w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
-    img = img[:, :w, :h].unsqueeze(0)
 
-    w_featmap = img.shape[-2] // patch_size
-    h_featmap = img.shape[-1] // patch_size
+    for img in imgs:
+        patch_size = patch_size
+        # make the image divisible by the patch size
+        w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
+        img = img[:, :w, :h].unsqueeze(0)
 
-    all_attentions = []
-    for i, model in enumerate(models):
-        attentions = model.get_last_selfattention(img)
+        w_featmap = img.shape[-2] // patch_size
+        h_featmap = img.shape[-1] // patch_size
 
-        nh = attentions.shape[1]  # number of head
+        all_attentions = []
+        for i, model in enumerate(models):
+            attentions = model.get_last_selfattention(img)
 
-        # we keep only the output patch attention
-        attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
-        attentions = attentions.reshape(nh, w_featmap, h_featmap)
-        attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
+            nh = attentions.shape[1]  # number of head
 
-        all_attentions.append(attentions)
+            # we keep only the output patch attention
+            attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
+            attentions = attentions.reshape(nh, w_featmap, h_featmap)
+            attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
 
-        fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
-        if len(data) > 1:
-            fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
+            all_attentions.append(attentions)
 
-        for i in range(nh):
-            ax = axs[i]
-            ax.imshow(attentions[i].detach().numpy())
-            ax.axis("off")
+            fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+            if len(data) > 1:
+                fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
 
-        last = axs[-1]
-        last.imshow(reshape_for_plot(img[0].cpu()))
+            for i in range(nh):
+                ax = axs[i]
+                ax.imshow(attentions[i].detach().numpy())
+                ax.axis("off")
 
-        fig.tight_layout()
+            last = axs[-1]
+            last.imshow(reshape_for_plot(img[0].cpu()))
 
-        if not path:
-            path = f"./plots/dino_attn"
+            fig.tight_layout()
 
-        os.makedirs(path, exist_ok=True)
-        fig.savefig(f"{path}/{time.ctime()}_attention.svg")
+            if not path:
+                path = f"./plots/dino_attn"
 
-        if plot:
-            plt.show()
+            os.makedirs(path, exist_ok=True)
+            fig.savefig(f"{path}/{time.ctime()}_attention.svg")
 
-    plt.close()
+            if plot:
+                plt.show()
+
+        plt.close()
     return img[0], all_attentions[0]
 
 

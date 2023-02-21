@@ -55,12 +55,12 @@ What are
 - [x] depthwise conv (used in mobilenet)
 - [x] FLOPs
 - [x] layernorm
-- [ ] DINO teacher centering?
+- [x] DINO teacher centering?
 - [ ] JFT-300M
 - [ ] Inception style pre-processing
-- [ ] GPaCo/PaCo
+- [x] GPaCo/PaCo
 - [x] t-SNE
-- [ ] KL-divergence
+- [x] KL-divergence
 
 Also check out ConvNext paper and Momentum Contrast.
 
@@ -229,11 +229,11 @@ SAM-ViT papers uses 10% of ImageNet training set (~120.000) and resolution of 50
 
 TODOs:
 
-- [x] eval loss landscape for pretrained ViT
+- [ ] eval loss landscape for pretrained ViT
 - [x] cleanup code and push to repo
 - [x] implement CIFAR10-C eval in pipeline
 - [x] understand/implement code for visualizing attention maps
-- [x] train ResNet
+- [ ] ~~train ResNet~~
 
 ViT-T/8 on M1 ~1.8it/s
 ViT-T/8 on Lenovo ~3.5it/s
@@ -356,6 +356,41 @@ checking andrej karpathys training recipe for reference [link to his blog](http:
 
 idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
 -> depends on the data and the model though
+
+
+## 04.12.2022
+
+working on training with smaller convnexts (atto/femto)
+
+## 10.12.2022
+
+retraining good performing older models on colab pro, implemented linear probing
+
+## 11.01.2023
+training ViT/ConvNext
+trying to get data from Sea.ai fiftyone server, a lot of troubleshooting
+
+setting up new pc from ben with better gpu
+
+## 12.01.2023
+
+retraining MobileNetv3 on new pc, using LARS optimizer getting better results than AdamW
+also retraining convnext_pico now, also works great with LARS
+currently running with 500 epoch trainings, convnext kNN is still increasing -> try 1000 epochs next?
+
+- [ ] try one larger version of mobilenetv3?
+- [ ] try convnextv2_pico? 
+- [ ] try mobilevitv2_100, weight decay 0.05, min_lr 1e-6, lr 0.02, smaller batch size?
+
+## 13.01.2023
+
+finally got the first sample of sea.ai dataset, 20.000 datapoints
+will implement new pre-processing and data loading now, then try training with DINO
+
+i will also try to integrate contrastive loss and SimCLR into the training pipeline next
+
+for the CIFAR10 models, im still missing linear evaluation on the best ones, and then evaluation on CIFAR10-C
+prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100 
 
 ## 18.01.2023
 
