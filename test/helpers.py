@@ -79,8 +79,6 @@ def get_base_test_args():
         input_size=32,
         learning_rate=0.0001,
         local_crops_scale=(0.2, 0.5),
-        local_crop_input_factor=1,
-        norm_last_layer=False,
         lr_decay=0.5,
         min_lr=1e-06,
         momentum=0.9,
