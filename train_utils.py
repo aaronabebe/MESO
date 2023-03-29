@@ -3,12 +3,15 @@ import os
 import pprint
 import time
 
+import numpy as np
 import torch
+import tqdm
+from sklearn.metrics import accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.tensorboard import SummaryWriter
 
 from data import get_dataloader, default_transforms, get_mean_std, DinoTransforms
 from fo_utils import get_dataset
-from knn import compute_knn
 from utils import LARS, get_experiment_name, TENSORBOARD_LOG_DIR
 from visualize import dino_attention, grad_cam, t_sne
 
@@ -115,7 +118,7 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
         wandb.log({f'{prefix}_knn_acc': current_acc}, step=n_steps)
     if args.visualize and epoch % 10 == 0:
         if 'vit_' in args.model:
-            orig, attentions = dino_attention([model], args.patch_size, (example_viz_img,),
+            orig, attentions = dino_attention(args, [model], args.patch_size, (example_viz_img,),
                                               plot=False,
                                               path=output_dir)
         else:
@@ -127,3 +130,35 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
             wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)
 
     return current_acc
+
+
+@torch.no_grad()
+def compute_knn(backbone, train_loader_plain, val_loader_plain):
+    device = next(backbone.parameters()).device
+
+    data_loaders = {
+        "train": train_loader_plain,
+        "val": val_loader_plain,
+    }
+    lists = {
+        "X_train": [],
+        "y_train": [],
+        "X_val": [],
+        "y_val": [],
+    }
+
+    for name, data_loader in data_loaders.items():
+        for imgs, y in tqdm.auto.tqdm(data_loader, position=3, leave=False, desc=f" embedding {name}"):
+            imgs = imgs.to(device)
+            lists[f"X_{name}"].append(backbone(imgs).detach().cpu().numpy())
+            lists[f"y_{name}"].append(y.detach().cpu().numpy())
+
+    arrays = {k: np.concatenate(l) for k, l in lists.items()}
+
+    estimator = KNeighborsClassifier(algorithm='ball_tree')
+    estimator.fit(arrays["X_train"], arrays["y_train"])
+    y_val_pred = estimator.predict(arrays["X_val"])
+
+    acc = accuracy_score(arrays["y_val"], y_val_pred)
+
+    return acc

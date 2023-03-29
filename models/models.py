@@ -1,13 +1,10 @@
 from functools import partial
 
-import pytorch_lightning as pl
 import timm
 import torch
 import wandb
 from timm.models import register_model
 from torch import nn
-from torch.nn import functional as F
-from torchmetrics.functional import accuracy
 
 from models.convnext import ConvNeXt
 from models.vision_transformer import VisionTransformer
@@ -33,10 +30,23 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
     model = get_model(name, pretrained=pretrained, **kwargs)
 
     if pretrained:
+        if name == 'vit_base':
+            url = 'https://dl.fbaipublicfiles.com/dino/dino_vitbase8_pretrain/dino_vitbase8_pretrain.pth'
+            state_dict = torch.hub.load_state_dict_from_url(url, map_location=device)
+            model.load_state_dict(state_dict)
+            print('Using pretrained model from FAIR')
+        elif name == 'vit_small':
+            url = 'https://dl.fbaipublicfiles.com/dino/dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth'
+            state_dict = torch.hub.load_state_dict_from_url(url, map_location=device)
+            model.load_state_dict(state_dict)
+            print('Using pretrained model from FAIR')
+        else:
+            print('Using pretrained model from timm')
+
         model.eval()
         return model
 
-    if not path_override:
+    if path_override is None:
         if load_remote:
             wandb.init()
             artifact = wandb.use_artifact(f'mcaaroni/dino/{name}_{dataset}_model:latest', type='model')
@@ -45,11 +55,15 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
         else:
             path_override = get_latest_model_path(name)
 
-    ckpt = torch.load(path_override, map_location=device)
+        if path_override is None:
+            print('No pretrained model found. Starting with uninitialized weights.')
+            return model
 
-    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
-    model.eval()
-    return model
+        ckpt = torch.load(path_override, map_location=device)
+
+        model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
+        model.eval()
+        return model
 
 
 @register_model
@@ -78,22 +92,30 @@ def vit_small(patch_size=16, pretrained=False, **kwargs):
 
 
 @register_model
-def convnext_tiny(pretrained=False, pretrained_cfg=None, **kwargs):
+def vit_base(patch_size=8, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size, embed_dim=768, depth=12, num_heads=12, mlp_ratio=4,
+        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
+
+
+@register_model
+def convnext_tiny(pretrained=False, pretrained_cfg=None, pretrained_cfg_overlay=None, **kwargs):
     return ConvNeXt(depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], **kwargs)
 
 
 @register_model
-def convnext_pico(pretrained=False, pretrained_cfg=None, **kwargs):
+def convnext_pico(pretrained=False, pretrained_cfg=None, pretrained_cfg_overlay=None, **kwargs):
     return ConvNeXt(depths=[2, 2, 6, 2], dims=[64, 128, 256, 512], **kwargs)
 
 
 @register_model
-def convnext_femto(pretrained=False, pretrained_cfg=None, **kwargs):
+def convnext_femto(pretrained=False, pretrained_cfg=None, pretrained_cfg_overlay=None, **kwargs):
     return ConvNeXt(depths=[2, 2, 6, 2], dims=[48, 96, 192, 384], **kwargs)
 
 
 @register_model
-def convnext_atto(pretrained=False, pretrained_cfg=None, **kwargs):
+def convnext_atto(pretrained=False, pretrained_cfg=None, pretrained_cfg_overlay=None, **kwargs):
     return ConvNeXt(depths=[2, 2, 6, 2], dims=[40, 80, 160, 320], **kwargs)
 
 

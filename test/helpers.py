@@ -56,7 +56,7 @@ def test_mobilevit_fashion_mnist(args, main):
 def test_convnext_fiftyone(args, main):
     args.dataset = 'fiftyone'
     args.model = 'convnext_pico'
-    args.input_channels = 1
+    args.input_channels = 3
     main(args)
 
 
@@ -67,6 +67,8 @@ def get_base_test_args():
         clip_grad=3.0,
         compare=None,
         train_subset=34,
+        dataset='cifar10',
+        model='convnext_atto',
         test_subset=34,
         device='cpu',
         epochs=1,
@@ -88,6 +90,7 @@ def get_base_test_args():
         num_workers=1,
         optimizer='adamw',
         method='simclr',
+        timm=False,
         out_dim=1024,
         patch_size=4,
         resume=False,
@@ -102,5 +105,6 @@ def get_base_test_args():
         warmup_teacher_temp=0.04,
         warmup_teacher_temp_epochs=0,
         weight_decay=0.04,
-        weight_decay_end=0.4
+        weight_decay_end=0.4,
+        img_path=None
     )

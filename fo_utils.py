@@ -16,11 +16,11 @@ SUBSET_CLASS_MAP = {
     "WATER_OBJECTS": ["ALGAE", "FLOTSAM", "HORIZON", "OBJECT_REFLECTION", "SUN_REFLECTION", "UNKNOWN", "WATERTRACK"]
 }
 
-SAILING_CLASSES_V1 = {
+SAILING_CLASSES_V1 = (
     "BOAT", "BOAT_WITHOUT_SAILS", "CONSTRUCTION", "CONTAINER_SHIP", "CRUISE_SHIP", "FAR_AWAY_OBJECT",
     "FISHING_SHIP", "HARBOUR_BUOY", "MARITIME_VEHICLE", "MOTORBOAT", "SAILING_BOAT", "SAILING_BOAT_WITH_CLOSED_SAILS",
     "SAILING_BOAT_WITH_OPEN_SAILS", "SHIP", "WATERTRACK"
-}
+)
 
 
 def map_class_to_subset(label: str):
@@ -28,6 +28,20 @@ def map_class_to_subset(label: str):
     if label is None:
         raise ValueError(f"Label {label} not found in class map")
     return label
+
+
+def get_crop_size_filter(min_crop_size: int = 32):
+    bbox_area = (
+            F("$metadata.width")
+            * F("bounding_box")[2]
+            * F("$metadata.height")
+            * F("bounding_box")[3]
+    )
+    return min_crop_size ** 2 < bbox_area
+
+
+def get_class_filter():
+    return F("label").is_in(SAILING_CLASSES_V1)
 
 
 def get_dataset(
@@ -38,29 +52,23 @@ def get_dataset(
     # this needs to be set to load custom datatypes
     fo.config.module_path = "custom_embedded_files"
 
-    try:
+    if fo.dataset_exists(dataset_name):
+        dataset = fo.load_dataset(dataset_name)
+    else:
         dataset = fo.Dataset.from_dir(
             dataset_dir=dataset_dir,
             dataset_type=fo.types.FiftyOneDataset,
             name=dataset_name,
             label_field=ground_truth_label
         )
-    except ValueError:
-        dataset = fo.load_dataset(dataset_name)
-
-    bbox_area = (
-            F("$metadata.width")
-            * F("bounding_box")[2]
-            * F("$metadata.height")
-            * F("bounding_box")[3]
-    )
 
     view = dataset.select_group_slices(['thermal_left', 'thermal_right'])
-    view = view.filter_labels(
-        GROUND_TRUTH_LABEL, (min_crop_size ** 2 < bbox_area)
-    )
-    view = view.filter_labels(
-        GROUND_TRUTH_LABEL, F("label").is_in(SAILING_CLASSES_V1)
-    )
+    # # set default filters for now
+    filters = [get_crop_size_filter(1), get_class_filter()]
+
+    for f in filters:
+        view = view.filter_labels(GROUND_TRUTH_LABEL, f)
+
+    print('Imported', len(view), 'samples after applying filters.')
     train_len, val_len = int(split[0] * len(view)), int(split[1] * len(view))
     return view.take(train_len), view.take(val_len)

@@ -5,6 +5,7 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from PIL import Image
 from pytorch_grad_cam import GradCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
@@ -37,8 +38,10 @@ def grad_cam(model, model_name, data, plot=True, path=None):
 
     if 'vit_' in model_name:
         target_layer = [model.blocks[-1].norm1]
-    elif 'convnext' in model_name or 'mobilevit' in model_name:
+    elif 'convnext_' in model_name or 'mobilevit' in model_name:
         target_layer = [model.stages[-1][-1]]
+    elif 'convnextv2' in model_name:
+        target_layer = [model.stages[-1].blocks[-1]]
     elif 'mobilenet' in model_name:
         target_layer = [model.blocks[-1][0].bn1]
     else:
@@ -116,7 +119,7 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
 
 
 @torch.no_grad()
-def dino_attention(models, patch_size, data, plot=True, path=None, sample_size=2):
+def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_size=2, avg_heads=True):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -126,7 +129,6 @@ def dino_attention(models, patch_size, data, plot=True, path=None, sample_size=2
     random_choice = random.randint(0, len(data[0]) - 1)
 
     imgs = data[0][random_choice:random_choice + sample_size]
-
 
     for img in imgs:
         patch_size = patch_size
@@ -150,17 +152,25 @@ def dino_attention(models, patch_size, data, plot=True, path=None, sample_size=2
 
             all_attentions.append(attentions)
 
-            fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
-            if len(data) > 1:
-                fig.suptitle(f"Input image class: {CIFAR10_LABELS[data[1][random_choice]]}")
-
-            for i in range(nh):
-                ax = axs[i]
-                ax.imshow(attentions[i].detach().numpy())
-                ax.axis("off")
+            if avg_heads:
+                fig, axs = plt.subplots(1, 2, figsize=(14, 10))
+                avg_attn = sum(attentions[i] * 1 / attentions.shape[0] for i in range(attentions.shape[0]))
+                axs[0].imshow(avg_attn.detach().numpy())
+                axs[0].axis("off")
+            else:
+                fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+                for j in range(nh):
+                    ax = axs[j]
+                    ax.imshow(attentions[j].detach().numpy())
+                    ax.axis("off")
 
             last = axs[-1]
             last.imshow(reshape_for_plot(img[0].cpu()))
+            last.axis("off")
+
+            if len(data) > 1:
+                labels_map = get_class_labels(dataset_name=args.dataset)
+                fig.suptitle(f"Input image class: {labels_map[data[1][random_choice]]}")
 
             fig.tight_layout()
 
@@ -175,6 +185,92 @@ def dino_attention(models, patch_size, data, plot=True, path=None, sample_size=2
 
         plt.close()
     return img[0], all_attentions[0]
+
+
+@torch.no_grad()
+def dino_simple_projection(args, model, patch_size, data, plot=True, path=None, sample_size=2):
+    # use only one random image for now
+    random_choice = random.randint(0, len(data[0]) - 1)
+    img = data[0][random_choice]
+    print(img.shape)
+
+    w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
+    img = img[:, :w, :h].unsqueeze(0)
+
+    w_featmap = img.shape[-2] // patch_size
+    h_featmap = img.shape[-1] // patch_size
+
+    query_points = torch.tensor(
+        [
+            # [-.1, 0.0],
+            # [.5, .8],
+            [-9., -.9],
+            [9., -.9],
+            [.0, .0],
+            [.9, .9],
+            [-.9, .9],
+        ]
+    ).reshape(1, 5, 1, 2)
+
+    feat = model.get_intermediate_layers(img)[0]
+    print('feat', feat.shape)
+    feats1 = feat[:, 1:, :].reshape(feat.shape[0], h_featmap, w_featmap, -1).permute(0, 3, 1, 2)
+    print('feats1', feats1.shape)
+    print('query_points', query_points.shape)
+    print('query_points', query_points.permute(0, 2, 1, 3).shape)
+
+    sfeats1 = F.grid_sample(feats1, query_points.permute(0, 2, 1, 3), padding_mode='border', align_corners=True)
+
+    attn_intra = torch.einsum("nchw,ncij->nhwij", F.normalize(sfeats1, dim=1), F.normalize(feats1, dim=1))
+    attn_intra -= attn_intra.mean([3, 4], keepdims=True)
+    attn_intra = attn_intra.clamp(0).squeeze(0)
+
+    heatmap_intra = F.interpolate(
+        attn_intra, img.shape[2:], mode="bilinear", align_corners=True).squeeze(0).detach().cpu()
+
+    print('heatmap_intra', heatmap_intra.shape)
+    print(heatmap_intra)
+
+    colors = np.array([
+        [128, 0, 0],
+        [0, 128, 0],
+        [0, 0, 128],
+        [128, 128, 0],
+        [128, 0, 128],
+    ])
+
+    result_images = [torch.zeros((3, img.shape[2], img.shape[3])) for _ in range(5)]
+    for i in range(heatmap_intra.shape[0]):
+        result_images[i] = heatmap_intra[i] * torch.tensor(colors[i]).reshape(3, 1, 1)
+
+    nr = len(result_images)
+    fig, axs = plt.subplots(1, nr + 1, figsize=(nr * 5, nr))
+    for j in range(nr):
+        ax = axs[j]
+        ax.imshow(result_images[j].detach().permute(1, 2, 0))
+        ax.set_title(query_points[0, j].numpy()[0])
+
+    last = axs[-1]
+    last.imshow(reshape_for_plot(img[0].cpu()))
+    last.axis("off")
+
+    if len(data) > 1:
+        labels_map = get_class_labels(dataset_name=args.dataset)
+        fig.suptitle(f"Input image class: {labels_map[data[1][random_choice]]}")
+
+    fig.tight_layout()
+
+    if not path:
+        path = f"./plots/dino_simple_projection"
+
+    os.makedirs(path, exist_ok=True)
+    fig.savefig(f"{path}/{time.ctime()}.svg")
+
+    if plot:
+        plt.show()
+
+    plt.close()
+    return img
 
 
 @torch.no_grad()
@@ -203,28 +299,83 @@ def dino_augmentations(args, data):
     plt.show()
 
 
+def load_example_viz_image(image_path, input_channels, dataset, transforms):
+    img = Image.open(image_path)
+    if input_channels == 1:
+        img = img.convert('L')
+    else:
+        if dataset == 'fiftyone':
+            img = img.convert('L')
+            img = Image.merge('RGB', (img, img, img))
+        else:
+            img = img.convert('RGB')
+
+    img = transforms(img)
+
+    # add two 0 dims to match dataloader batch
+    data = torch.as_tensor(img)
+    data = data.unsqueeze(0)
+    data = data.unsqueeze(0)
+    return data
+
+
+def is_timm_compatible(model_name):
+    return model_name in ['vit_', 'convnextv2']
+
+
 def main(args):
     print(f'Visualizing {args.visualize} for {args.model} model...')
 
     fix_seeds(args.seed)
 
-    fo_dataset = None
-    if args.dataset == 'fiftyone':
-        fo_dataset, _ = get_dataset()
+    # transforms
+    if args.visualize in ['dino_attn', 'dino_proj', 'grad_cam']:
+        transforms = default_transforms(768)
+    elif args.visualize == 'dino_augs':
+        mean, std = get_mean_std(args.dataset)
+        transforms = DinoTransforms(
+            args.input_size, args.input_channels,
+            args.n_local_crops, args.local_crops_scale,
+            args.global_crops_scale, mean=mean, std=std
+        )
+    else:
+        # use default transforms per dataset
+        transforms = None
 
+    # data
+    if args.img_path is None:
+        fo_dataset = None
+        if args.dataset == 'fiftyone':
+            fo_dataset, _ = get_dataset()
+        dl = get_dataloader(
+            args.dataset,
+            transforms=transforms,
+            fo_dataset=fo_dataset,
+            train=False,
+            subset=args.test_subset,
+            batch_size=args.batch_size
+        )
+        data = next(iter(dl))
+    else:
+        data = load_example_viz_image(args.img_path, args.input_channels, args.dataset, transforms)
+
+    # model
+    model = get_eval_model(
+        args.model,
+        args.device,
+        args.dataset,
+        path_override=args.ckpt_path,
+        in_chans=args.input_channels,
+        num_classes=args.num_classes,
+        patch_size=args.patch_size if is_timm_compatible(args.model) else None,
+        img_size=args.input_size if is_timm_compatible(args.model) else None,
+        load_remote=args.wandb,
+        pretrained=args.timm
+    )
+
+    # viz
     if args.visualize == 'dino_attn':
         models = []
-        model = get_eval_model(
-            args.model,
-            args.device,
-            args.dataset,
-            path_override=args.ckpt_path,
-            in_chans=args.input_channels,
-            num_classes=0,
-            patch_size=args.patch_size if 'vit' in args.model else None,
-            img_size=32,
-            load_remote=args.wandb
-        )
         models.append(model)
         if args.compare:
             model2 = get_eval_model(
@@ -233,78 +384,27 @@ def main(args):
                 args.dataset,
                 path_override=args.compare,
                 in_chans=args.input_channels,
-                num_classes=0,
+                num_classes=args.num_classes,
                 patch_size=args.patch_size if 'vit' in args.model else None,
-                img_size=32,
+                img_size=args.input_size,
                 load_remote=False
             )
             models.append(model2)
-
-        dl = get_dataloader(
-            args.dataset,
-            transforms=default_transforms(args.input_size),
-            fo_dataset=fo_dataset,
-            train=False,
-            subset=1,
-            batch_size=args.batch_size
-        )
-        data = next(iter(dl))
-        dino_attention(models, args.patch_size, data)
+        dino_attention(args, models, args.patch_size, data)
 
     elif args.visualize == 'dino_augs':
-        mean, std = get_mean_std(args.dataset)
-        dino_transforms = DinoTransforms(args.input_size, args.input_channels, args.n_local_crops,
-                                         args.local_crops_scale, args.global_crops_scale, mean=mean, std=std)
-        dl = get_dataloader(
-            args.dataset,
-            transforms=dino_transforms,
-            fo_dataset=fo_dataset,
-            subset=1,
-            train=False,
-            batch_size=args.batch_size
-        )
-        data = next(iter(dl))
         dino_augmentations(args, data)
 
+    elif args.visualize == 'dino_proj':
+        dino_simple_projection(args, model, args.patch_size, data)
+
     elif args.visualize == 'grad_cam':
-        model = get_eval_model(
-            args.model,
-            args.device,
-            args.dataset,
-            path_override=args.ckpt_path,
-            in_chans=args.input_channels,
-            num_classes=args.num_classes,
-            patch_size=args.patch_size if 'vit_' in args.model else None,
-            img_size=args.input_size if 'vit_' in args.model else None,
-            load_remote=args.wandb
-        )
-        dl = get_dataloader(
-            args.dataset,
-            transforms=default_transforms(args.input_size),
-            fo_dataset=fo_dataset,
-            subset=1,
-            train=False, batch_size=args.batch_size
-        )
-        data = next(iter(dl))
         grad_cam(model, args.model, data)
+
     elif args.visualize == 'tsne':
-        model = get_eval_model(
-            args.model,
-            args.device,
-            args.dataset,
-            path_override=args.ckpt_path,
-            in_chans=args.input_channels,
-            num_classes=args.num_classes,
-            patch_size=args.patch_size if 'vit_' in args.model else None,
-            img_size=args.input_size if 'vit_' in args.model else None,
-            load_remote=args.wandb
-        )
-        dl = get_dataloader(
-            args.dataset,
-            subset=args.test_subset,
-            fo_dataset=fo_dataset,
-            train=False, batch_size=args.batch_size
-        )
+        if args.img_path is not None:
+            print('tsne only works with full dataset')
+
         t_sne(args, model, dl)
     else:
         raise NotImplementedError(f'Visualization {args.visualize} not implemented.')

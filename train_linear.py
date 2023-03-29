@@ -12,6 +12,7 @@ from train_utils import get_writer
 from utils import get_args, get_model_embed_dim, fix_seeds, eval_accuracy
 
 N_LAST_BLOCKS_VIT_SMALL = 4
+N_LAST_BLOCKS_VIT_BASE = 1
 
 
 def main(args: argparse.Namespace):
@@ -24,7 +25,6 @@ def main(args: argparse.Namespace):
         wandb.init(project="linear", config=vars(args))
         wandb.watch_called = False
 
-    pretrained = True
     model = get_eval_model(
         args.model,
         args.device,
@@ -32,10 +32,9 @@ def main(args: argparse.Namespace):
         path_override=args.ckpt_path,
         in_chans=args.input_channels,
         num_classes=0,
-        # patch_size=args.patch_size if 'vit_' in args.model else None,
         img_size=args.input_size if 'vit_' in args.model else None,
         load_remote=args.wandb,
-        pretrained=pretrained,
+        pretrained=args.timm,
     )
 
     embed_dim = get_model_embed_dim(model, args.model)
@@ -48,20 +47,11 @@ def main(args: argparse.Namespace):
             model.head.fc = nn.Identity()
         else:
             model.head = nn.Identity()
-    # TODO: make this a function
 
+    n_last_blocks = N_LAST_BLOCKS_VIT_BASE
     model.to(device)
-    if pretrained:
-        url = 'https://dl.fbaipublicfiles.com/dino/dino_deitsmall16_pretrain/dino_deitsmall16_pretrain.pth'
-        state_dict = torch.hub.load_state_dict_from_url(url, map_location=device)
-        model.load_state_dict(state_dict)
 
-        # replace 3 channels with 1 channel
-        if args.dataset == 'fiftyone':
-            # only using first channel, try out other channels
-            model.patch_embed.proj.weight = nn.Parameter(model.patch_embed.proj.weight[:, 0:1, :, :])
-
-    linear_classifier = LinearClassifier(embed_dim * N_LAST_BLOCKS_VIT_SMALL, num_labels=args.num_classes)
+    linear_classifier = LinearClassifier(embed_dim * n_last_blocks, num_labels=args.num_classes)
     linear_classifier = linear_classifier.to(device)
 
     if args.dataset == 'fiftyone':
@@ -72,7 +62,7 @@ def main(args: argparse.Namespace):
             num_workers=args.num_workers,
             train=True,
             batch_size=args.batch_size,
-            subset=-1
+            subset=args.train_subset,
         )
         val_loader = get_dataloader(
             args.dataset,
@@ -80,20 +70,20 @@ def main(args: argparse.Namespace):
             num_workers=args.num_workers,
             train=False,
             batch_size=args.batch_size,
-            subset=-1
+            subset=args.test_subset,
         )
     else:
         train_loader = get_dataloader(
             args.dataset, train=True,
             num_workers=args.num_workers,
             batch_size=args.batch_size,
-            subset=-1
+            subset=args.train_subset,
         )
         val_loader = get_dataloader(
             args.dataset, train=False,
             num_workers=args.num_workers,
             batch_size=args.batch_size,
-            subset=-1
+            subset=args.test_subset,
         )
 
     optimizer = torch.optim.SGD(
@@ -122,8 +112,8 @@ def main(args: argparse.Namespace):
                 for it, (images, labels) in progress_bar:
                     images, labels = images.to(device), labels.to(device)
                     with torch.no_grad():
-                        if "vit" in args.model:
-                            intermediate_output = model.get_intermediate_layers(images, N_LAST_BLOCKS_VIT_SMALL)
+                        if "vit_" in args.model:
+                            intermediate_output = model.get_intermediate_layers(images, n_last_blocks)
                             output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                         else:
                             output = model(images)
@@ -136,13 +126,17 @@ def main(args: argparse.Namespace):
                     acc1s.append(acc1)
                     acc5s.append(acc5)
                     writer.add_scalar("val/loss", loss.item(), n_steps)
-                    writer.add_scalar("val/acc1", acc1, n_steps)
-                    writer.add_scalar("val/acc5", acc5, n_steps)
                     if args.wandb:
-                        wandb.log({"val/loss": loss.item(), "val/acc1": acc1, "val/acc5": acc5})
+                        wandb.log({"val/loss": loss.item()})
                     n_steps += 1
+
                 acc1 = torch.mean(torch.stack(acc1s))
                 acc5 = torch.mean(torch.stack(acc5s))
+
+                writer.add_scalar("val/acc1", acc1, n_steps)
+                writer.add_scalar("val/acc5", acc5, n_steps)
+                if args.wandb:
+                    wandb.log({"val/acc1": acc1, "val/acc5": acc5})
 
                 print(f"acc1: {acc1:.2f} acc5: {acc5:.2f}")
 
@@ -171,8 +165,8 @@ def main(args: argparse.Namespace):
         for it, (images, labels) in progress_bar:
             images, labels = images.to(device), labels.to(device)
             with torch.no_grad():
-                if "vit" in args.model:
-                    intermediate_output = model.get_intermediate_layers(images, N_LAST_BLOCKS_VIT_SMALL)
+                if "vit_" in args.model:
+                    intermediate_output = model.get_intermediate_layers(images, n_last_blocks)
                     output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                 else:
                     output = model(images)

@@ -379,7 +379,7 @@ also retraining convnext_pico now, also works great with LARS
 currently running with 500 epoch trainings, convnext kNN is still increasing -> try 1000 epochs next?
 
 - [ ] try one larger version of mobilenetv3?
-- [ ] try convnextv2_pico? 
+- [x] try convnextv2_pico?
 - [ ] try mobilevitv2_100, weight decay 0.05, min_lr 1e-6, lr 0.02, smaller batch size?
 
 ## 13.01.2023
@@ -482,16 +482,79 @@ otherwise same configuration
 ## 15.02.2023
 
 implemented contrastive learning pipeline -> working good on cifar10, similar or better to DINO wrt to kNN accuracy
-trying out linear eval now. 
-testing linear eval with DINO pretrained ViT-Small on sailing subset
+trying out linear eval now.
 
-- [ ] cleanup linear eval code, add visualizations
 - [x] reduce amount of classes in sailing subset from 35 -> 15 maybe?
 - [x] add check to guarantee same classes in train/val/test splits
 
+## 22.02.2023
 
+testing linear eval with DINO pretrained ViT-Base16 on sailing subset
+main question is how to handle 3 channels of DINO vs 1 channel of sailing dataset
 
+- [x] only use one channel of DINO (R/G/B)
+- [x] use all 3 channels of DINO and copy sailing dataset to 3 channels
+- [ ] add convolution to DINO to go from 1 to 3 channels
 
+- [x] try out different visualizations with pretrained dino models
+- [ ] cleanup model loading code for better loading of pretrained models
+- [x] try out pretrained convnextv2 feature embs and compare to dino
+- [ ] add visualization to linear eval code
+- [x] recheck dino_attn viz code to see if it really works correctly
+- [x] try out dino attn with whole image from sailing dataset
+- [x] fix dino model patch size bug
+
+#### Vit-Base16
+
+3 channel copy: kNN 0.82
+R channel: kNN 0.773334
+G channel: kNN 0.8
+B channel: knn 0.793334
+
+## 02.03.2023
+
+trying out pre-trained convnextv2 models with train_ssl DINO
+
+results for using pre-trained models embeddings:
+convnextv2-base: kNN 0.80667
+convnextv2-tiny: kNN 0.78667
+convnextv2-atto: kNN 0.8
+convnextv2-huge: knn 0.78
+mobilevitv2-200: knn 0.71334
+
+- [x] try out grad-cam for whole images with pretrained convnextv2
+
+## 08.03.2023
+
+### plan for march
+
+finish up all current tasks
+try to consolidate
+create timeline and summary of current progress -> find holes and missing parts to make everything sound reasonable
+
+## 15.03.2023
+
+re-evaluating kNN on DINO ViT-B with less clean dataset, by removing min_crop_size filter samples from 1503 -> 5363
+kNN accuracy: 0.8152985074626866
+
+also tested swinv2 base 224
+kNN accuracy: 0.5093283582089553
+
+mobilenetv3_large_100
+kNN accuracy: 0.7966417910447762
+
+mobilevitv2_200_in22ft1k
+kNN accuracy: 0.6996268656716418
+
+refactored visualization code
+
+how to test robustness on current sailing dataset without videos? -> kNN embs, what else?
+
+- [ ] revisit loss landscapes
+
+tried out STEGO pretrained models to check segmentation capabilities
+
+## 29.03.2023
 
 
 

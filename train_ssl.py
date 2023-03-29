@@ -1,5 +1,4 @@
 import math
-import math
 import os
 import sys
 
@@ -34,7 +33,8 @@ def main(args):
         in_chans=args.input_channels,
         num_classes=args.num_classes,
         patch_size=args.patch_size if 'vit_' in args.model else None,
-        img_size=args.input_size if 'vit_' in args.model else None
+        img_size=args.input_size if 'vit_' in args.model else None,
+        pretrained=args.timm,
     )
 
     embed_dim = get_model_embed_dim(student, args.model)
@@ -48,7 +48,8 @@ def main(args):
         in_chans=args.input_channels,
         num_classes=args.num_classes,
         patch_size=args.patch_size if 'vit_' in args.model else None,
-        img_size=args.input_size if 'vit_' in args.model else None
+        img_size=args.input_size if 'vit_' in args.model else None,
+        pretrained=args.timm,
     )
     teacher = MultiCropWrapper(teacher,
                                MLPHead(in_dim=embed_dim, out_dim=args.out_dim, norm_last_layer=args.norm_last_layer))

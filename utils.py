@@ -1,5 +1,4 @@
 import argparse
-import tqdm
 import glob
 import os
 import random
@@ -7,6 +6,7 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
+import tqdm
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -49,9 +49,6 @@ CIFAR100_LABELS = (
     'snail', 'snake', 'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
     'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf',
     'woman', 'worm'
-)
-FASHION_MNIST_LABELS = (
-    'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
 )
 
 
@@ -123,8 +120,10 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--resume", action='store_true', default=False,
                         help='Try to resume training from last checkpoint.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
-    parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_augs', 'grad_cam', 'tsne'],
+    parser.add_argument("--timm", action='store_true', default=False, help='Use pretrained timm model.')
+    parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_proj', 'dino_augs', 'grad_cam', 'tsne'],
                         help="Visualize the model during the training.")
+    parser.add_argument("--img_path", type=str, help="Path override for image for visualization.")
     return parser.parse_args()
 
 
@@ -149,6 +148,9 @@ def remove_prefix(state_dict, prefix):
 
 def get_latest_model_path(name):
     model_version_path = f'{TENSORBOARD_LOG_DIR}/{name}'
+    if not os.path.exists(model_version_path):
+        return None
+
     latest_version = sorted(
         os.listdir(model_version_path),
         reverse=True,
@@ -230,7 +232,7 @@ def get_model_embed_dim(model, arch_name):
         return model.num_features
 
 
-def grad_cam_reshape_transform(tensor, height=4, width=4):
+def grad_cam_reshape_transform(tensor, height=8, width=8):
     result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
 
     # Bring the channels to the first dimension,

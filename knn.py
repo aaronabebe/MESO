@@ -1,37 +1,32 @@
-import numpy as np
-import torch
-import tqdm
-from sklearn.metrics import accuracy_score
-from sklearn.neighbors import KNeighborsClassifier
+from models.models import get_eval_model
+from train_utils import get_data_loaders, compute_knn
+from utils import get_args, fix_seeds
+from visualize import is_timm_compatible
 
 
-@torch.no_grad()
-def compute_knn(backbone, train_loader_plain, val_loader_plain):
-    device = next(backbone.parameters()).device
+def main(args):
+    print(f'Running kNN eval for {args.model} model...')
 
-    data_loaders = {
-        "train": train_loader_plain,
-        "val": val_loader_plain,
-    }
-    lists = {
-        "X_train": [],
-        "y_train": [],
-        "X_val": [],
-        "y_val": [],
-    }
+    fix_seeds(args.seed)
 
-    for name, data_loader in tqdm.auto.tqdm(data_loaders.items(), position=2, leave=False, desc=" kNN eval"):
-        for imgs, y in data_loader:
-            imgs = imgs.to(device)
-            lists[f"X_{name}"].append(backbone(imgs).detach().cpu().numpy())
-            lists[f"y_{name}"].append(y.detach().cpu().numpy())
+    model = get_eval_model(
+        args.model,
+        args.device,
+        args.dataset,
+        path_override=args.ckpt_path,
+        in_chans=args.input_channels,
+        num_classes=args.num_classes,
+        patch_size=args.patch_size if is_timm_compatible(args.model) else None,
+        img_size=args.input_size if is_timm_compatible(args.model) else None,
+        load_remote=args.wandb,
+        pretrained=args.timm
+    )
 
-    arrays = {k: np.concatenate(l) for k, l in lists.items()}
+    _, train_loader_plain, val_loader_plain, _ = get_data_loaders(args)
+    knn_acc = compute_knn(model, train_loader_plain, val_loader_plain)
+    print('------------------------')
+    print(f'kNN accuracy: {knn_acc}')
 
-    estimator = KNeighborsClassifier(algorithm='ball_tree')
-    estimator.fit(arrays["X_train"], arrays["y_train"])
-    y_val_pred = estimator.predict(arrays["X_val"])
 
-    acc = accuracy_score(arrays["y_val"], y_val_pred)
-
-    return acc
+if __name__ == '__main__':
+    main(get_args())

@@ -118,7 +118,7 @@ def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int
 def _get_fifty_one(transforms: torchvision.transforms, num_workers: int, subset: int, fo_dataset=None,
                    **kwargs) -> torch.utils.data.DataLoader:
     # load fifty one dataset
-    trainset = FiftyOneTorchDataset(
+    trainset = SailingLargestCropDataset(
         fo_dataset=fo_dataset,
         transform=transforms or default_fifty_one_transforms(),
     )
@@ -251,9 +251,52 @@ class CIFAR10CDataset(torchvision.datasets.VisionDataset):
         return len(self.data)
 
 
-class FiftyOneTorchDataset(torch.utils.data.Dataset):
-    def __init__(self, fo_dataset, transform: torchvision.transforms = None,
-                 ground_truth_label: str = GROUND_TRUTH_LABEL, use_class_subset: bool = False):
+class SailingDataset(torch.utils.data.Dataset):
+    def __init__(
+            self,
+            fo_dataset,
+            transform: torchvision.transforms = None,
+            ground_truth_label: str = GROUND_TRUTH_LABEL,
+    ):
+        self.transform = transform
+        self.samples = fo_dataset
+
+        self.transforms = transform
+        self.img_paths = self.samples.values("filepath")
+        self.ground_truth_label = ground_truth_label
+
+        all_classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
+        self.classes = all_classes
+
+        self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
+
+    def __getitem__(self, idx):
+        img_path = self.img_paths[idx]
+        sample = self.samples[img_path]
+        img = Image.open(img_path).convert("L")  # TODO handle 16bit and 8bit grayscale correctly while loading
+
+        if self.transform is not None:
+            img = Image.merge('RGB', (img, img, img))
+            img = self.transform(img)
+
+        targets = []
+        for detection in sample[self.ground_truth_label].detections:
+            targets.append(self.labels_map_rev[detection.label])
+
+        return img, targets
+
+    def __len__(self):
+        return len(self.samples)
+
+
+class SailingLargestCropDataset(torch.utils.data.Dataset):
+    def __init__(
+            self,
+            fo_dataset,
+            transform: torchvision.transforms = None,
+            ground_truth_label: str = GROUND_TRUTH_LABEL,
+            use_class_subset: bool = False,
+    ):
         self.samples = fo_dataset
 
         self.transforms = transform
@@ -266,7 +309,6 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
             self.classes = {map_class_to_subset(c) for c in all_classes}
         else:
             self.classes = all_classes
-            assert len(self.classes) == len(SAILING_CLASSES_V1), "Classes are not the same"
 
         self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
 
@@ -307,10 +349,6 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
                     )
                     crop = img.crop(crop_box)
 
-                # crop = np.array(crop, dtype=np.float64)
-                if self.transforms:
-                    crop = self.transforms(crop)
-
                 if self.use_class_subset:
                     label = self.labels_map_rev[map_class_to_subset(detection.label)]
                 else:
@@ -318,5 +356,10 @@ class FiftyOneTorchDataset(torch.utils.data.Dataset):
                 largest_crop = crop
                 largest_crop_label = label
                 largest_crop_area = detection.area
+
+        if self.transforms:
+            # TODO make this generic for input channels
+            largest_crop = Image.merge('RGB', (largest_crop, largest_crop, largest_crop))
+            largest_crop = self.transforms(largest_crop)
 
         return largest_crop, torch.as_tensor(largest_crop_label)

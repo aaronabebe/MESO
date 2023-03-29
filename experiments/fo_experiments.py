@@ -7,9 +7,8 @@ import torch
 from fiftyone import ViewField as F
 from torch.utils.data import Subset
 from tqdm import tqdm
-from torchvision import transforms
 
-from data import FiftyOneTorchDataset, default_fifty_one_transforms
+from data import SailingLargestCropDataset, default_fifty_one_transforms
 from fo_utils import DATASET_NAME, GROUND_TRUTH_LABEL, DATASET_DIR, get_dataset
 
 MIN_CROP_SIZE = 32
@@ -46,7 +45,7 @@ def calc_mean_std(loader: torch.utils.data.DataLoader):
 
 def main(args):
     fo_dataset, _ = get_dataset()
-    torch_dataset = FiftyOneTorchDataset(fo_dataset, transform=default_fifty_one_transforms())
+    torch_dataset = SailingLargestCropDataset(fo_dataset, transform=default_fifty_one_transforms())
     print('LEN DATASET TOTAL: ', len(torch_dataset))
     if args.mean_std:
         mean, std = calc_mean_std(torch.utils.data.DataLoader(torch_dataset, batch_size=1, shuffle=False))

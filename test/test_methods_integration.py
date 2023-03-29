@@ -23,4 +23,5 @@ def test_dino():
 
 def test_linear():
     args = get_base_test_args()
+    args.num_classes = 15
     run_model_tests_for(args, main_linear)
