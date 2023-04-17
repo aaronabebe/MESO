@@ -556,5 +556,12 @@ tried out STEGO pretrained models to check segmentation capabilities
 
 ## 29.03.2023
 
+- [ ] implement 16bit loading
+- [ ] what about RGB data? whole dataset?
 
+## 12.04.2023
 
+mounting NAS in office to train on full dataset
+
+PTH:
+/mnt/fiftyoneDB/Database/Image_Data/Thermal_Images_8Bit/Trip_14_Seq_1/1286352_l.png
