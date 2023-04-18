@@ -317,6 +317,87 @@ loss calculation, which led to weird eval results, hopefully fixed now,
 reading some new papers as well, SimCLR, MAE
 also starting with DINO training implementation
 
+#### ViT-S
+
+```json
+{
+  "arch": "vit_small",
+  "patch_size": 16,
+  "out_dim": 65536,
+  "norm_last_layer": false,
+  "warmup_teacher_temp": 0.04,
+  "teacher_temp": 0.07,
+  "warmup_teacher_temp_epochs": 30,
+  "use_fp16": false,
+  "weight_decay": 0.04,
+  "weight_decay_end": 0.4,
+  "clip_grad": 0,
+  "batch_size_per_gpu": 64,
+  "epochs": 800,
+  "freeze_last_layer": 1,
+  "lr": 0.0005,
+  "warmup_epochs": 10,
+  "min_lr": 1e-05,
+  "global_crops_scale": [
+    0.25,
+    1.0
+  ],
+  "local_crops_scale": [
+    0.05,
+    0.25
+  ],
+  "local_crops_number": 10,
+  "seed": 0,
+  "num_workers": 10,
+  "world_size": 16,
+  "ngpus": 8,
+  "nodes": 2,
+  "optimizer": "adamw",
+  "momentum_teacher": 0.996,
+  "use_bn_in_head": false,
+  "drop_path_rate": 0.1
+}
+```
+
+#### ResNet
+
+```json
+{
+  "arch": "resnet50",
+  "out_dim": 60000,
+  "norm_last_layer": true,
+  "warmup_teacher_temp": 0.04,
+  "teacher_temp": 0.07,
+  "warmup_teacher_temp_epochs": 50,
+  "use_fp16": false,
+  "weight_decay": 0.000001,
+  "weight_decay_end": 0.000001,
+  "clip_grad": 0,
+  "batch_size_per_gpu": 51,
+  "epochs": 800,
+  "freeze_last_layer": 1,
+  "lr": 0.3,
+  "warmup_epochs": 10,
+  "min_lr": 0.0048,
+  "global_crops_scale": [
+    0.14,
+    1.0
+  ],
+  "local_crops_scale": [
+    0.05,
+    0.14
+  ],
+  "local_crops_number": 6,
+  "seed": 0,
+  "num_workers": 10,
+  "world_size": 80,
+  "optimizer": "lars",
+  "momentum_teacher": 0.996,
+  "use_bn_in_head": true
+}
+```
+
+
 ## 16.11.2022
 
 starting with implementation for dino training for cifar10, maybe imagenet-tiny afterwards
