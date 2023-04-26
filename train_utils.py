@@ -6,11 +6,11 @@ import time
 import numpy as np
 import torch
 import tqdm
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.tensorboard import SummaryWriter
 
-from data import get_dataloader, default_transforms, get_mean_std, DinoTransforms
+from data import get_dataloader, default_resize_transforms, get_mean_std, DinoTransforms
 from fo_utils import get_dataset
 from utils import LARS, get_experiment_name, TENSORBOARD_LOG_DIR
 from visualize import dino_attention, grad_cam, t_sne
@@ -52,7 +52,7 @@ def get_data_loaders(args):
         val_loader_plain_subset = get_dataloader(
             args.dataset, fo_dataset=val_data.clone(),
             batch_size=1,
-            transforms=default_transforms(128),
+            transforms=default_resize_transforms(128),
             subset=1
         )
     else:
@@ -79,7 +79,7 @@ def get_data_loaders(args):
             args.dataset,
             train=False,
             batch_size=1,
-            transforms=default_transforms(128),
+            transforms=default_resize_transforms(128),
             # using a larger input size for visualization
             subset=1
         )
@@ -112,10 +112,19 @@ def get_writer(args, sub_dir):
 
 def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_plain, val_loader_plain, writer,
                wandb, epoch, prefix):
-    current_acc = compute_knn(model, train_loader_plain, val_loader_plain)
-    writer.add_scalar(f'{prefix}_knn_acc', current_acc, n_steps)
+    accuracy, precision, recall, f1 = compute_knn(model, train_loader_plain, val_loader_plain)
+    writer.add_scalar(f'{prefix}_knn_acc', accuracy, n_steps)
+    writer.add_scalar(f'{prefix}_knn_precision', precision, n_steps)
+    writer.add_scalar(f'{prefix}_knn_recall', recall, n_steps)
+    writer.add_scalar(f'{prefix}_knn_f1', f1, n_steps)
     if args.wandb:
-        wandb.log({f'{prefix}_knn_acc': current_acc}, step=n_steps)
+        wandb.log({
+            f'{prefix}_knn_acc': accuracy,
+            f'{prefix}_knn_precision': precision,
+            f'{prefix}_knn_recall': recall,
+            f'{prefix}_knn_f1': f1
+        }, step=n_steps)
+
     if args.visualize and epoch % 10 == 0:
         if 'vit_' in args.model:
             orig, attentions = dino_attention(args, [model], args.patch_size, (example_viz_img,),
@@ -126,10 +135,12 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
 
         tsne_fig = t_sne(args, model, val_loader_plain, plot=False, path=output_dir)
         if args.wandb:
-            wandb.log({f'{prefix}_grads': [wandb.Image(img) for img in attentions]}, step=n_steps)
-            wandb.log({f'{prefix}_tsne': wandb.Image(tsne_fig)}, step=n_steps)
+            wandb.log({
+                f'{prefix}_grads': [wandb.Image(img) for img in attentions],
+                f'{prefix}_tsne': wandb.Image(tsne_fig)
+            }, step=n_steps)
 
-    return current_acc
+    return accuracy
 
 
 @torch.no_grad()
@@ -160,5 +171,7 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
     y_val_pred = estimator.predict(arrays["X_val"])
 
     acc = accuracy_score(arrays["y_val"], y_val_pred)
+    precision, recall, f1, _ = precision_recall_fscore_support(arrays["y_val"], y_val_pred,
+                                                               average='weighted')  # TODO maybe change to macro
 
-    return acc
+    return acc, precision, recall, f1

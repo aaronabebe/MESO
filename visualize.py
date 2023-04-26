@@ -12,7 +12,7 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
-from data import get_dataloader, default_transforms, DinoTransforms, get_mean_std, get_class_labels
+from data import get_dataloader, default_resize_transforms, DinoTransforms, get_mean_std, get_class_labels
 from fo_utils import get_dataset
 from models.models import get_eval_model
 from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings, fix_seeds
@@ -330,7 +330,7 @@ def main(args):
 
     # transforms
     if args.visualize in ['dino_attn', 'dino_proj', 'grad_cam']:
-        transforms = default_transforms(768)
+        transforms = default_resize_transforms(768)
     elif args.visualize == 'dino_augs':
         mean, std = get_mean_std(args.dataset)
         transforms = DinoTransforms(

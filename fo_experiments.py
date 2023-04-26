@@ -8,8 +8,8 @@ from fiftyone import ViewField as F
 from torch.utils.data import Subset
 from tqdm import tqdm
 
-from data import SailingLargestCropDataset, default_fifty_one_transforms
-from fo_utils import DATASET_NAME, GROUND_TRUTH_LABEL, DATASET_DIR, get_dataset
+from data import SailingLargestCropDataset, default_empty_transforms
+from fo_utils import GROUND_TRUTH_LABEL, get_dataset, DATASET_NAME, DATASET_DIR
 
 MIN_CROP_SIZE = 32
 
@@ -29,24 +29,25 @@ def get_classes_dict(dataset: fo.Dataset):
 
 
 def calc_mean_std(loader: torch.utils.data.DataLoader):
-    channels_sum, channels_square_sum, num_batches = 0, 0, 0
+    mean, std, nb_samples = 0., 0., 0.
 
     for data, _ in tqdm(loader):
-        data = data / 255
-        channels_sum += torch.mean(data, dim=[])
-        channels_square_sum += torch.mean(data ** 2, dim=[])
-        num_batches += 1
+        batch_samples = data.size(0)
+        data = data.view(batch_samples, data.size(1), -1)
+        mean += data.mean(2).sum(0)
+        std += data.std(2).sum(0)
+        nb_samples += batch_samples
 
-    mean = channels_sum / num_batches
-    std = (channels_square_sum / num_batches - mean ** 2)
+    mean /= nb_samples
+    std /= nb_samples
 
     return mean, std
 
 
 def main(args):
-    fo_dataset, _ = get_dataset()
-    torch_dataset = SailingLargestCropDataset(fo_dataset, transform=default_fifty_one_transforms())
-    print('LEN DATASET TOTAL: ', len(torch_dataset))
+    fo_dataset, _ = get_dataset(use_16bit=args.use_16bit)
+    torch_dataset = SailingLargestCropDataset(fo_dataset, transform=default_empty_transforms(),
+                                              use_16bit=args.use_16bit)
     if args.mean_std:
         mean, std = calc_mean_std(torch.utils.data.DataLoader(torch_dataset, batch_size=1, shuffle=False))
         print('MEAN: ', mean)
@@ -70,19 +71,17 @@ def main(args):
     plt.show()
 
 
-def server_main(dataset_name: str = DATASET_NAME, dataset_dir: str = DATASET_DIR,
-                ground_truth_label: str = GROUND_TRUTH_LABEL):
+def server_main(args):
+    # dataset, _ = get_dataset(split=(1.0, 0.0), use_16bit=args.use_16bit)
+    fo.config.module_path = "custom_embedded_files"
     dataset = fo.Dataset.from_dir(
-        dataset_dir=dataset_dir,
+        dataset_dir=DATASET_DIR,
         dataset_type=fo.types.FiftyOneDataset,
-        name=dataset_name,
-        label_field=ground_truth_label
+        name=DATASET_NAME,
+        label_field=GROUND_TRUTH_LABEL
     )
-
     session = fo.launch_app(dataset)
     session.wait()
-
-    return dataset
 
 
 if __name__ == '__main__':
@@ -92,8 +91,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--launch_server", action='store_true', default=False)
     parser.add_argument("--mean_std", action='store_true', default=False)
+    parser.add_argument("--use_16bit", action='store_true', default=False)
     args = parser.parse_args()
+
     if args.launch_server:
-        server_main()
+        server_main(args)
     else:
         main(args)

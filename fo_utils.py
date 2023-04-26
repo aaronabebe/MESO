@@ -3,6 +3,8 @@ from fiftyone import ViewField as F
 
 DATASET_NAME = "SAILING_DATASET"
 DATASET_DIR = "/home/aaron/dev/data/20000_sample_aaron"
+# DATASET_DIR = "/mnt/fiftyoneDB/Database/Annotation_Data/SAILING_DATASET"
+DATASET_DIR_16BIT = "/home/aaron/dev/data/data_16bit"
 GROUND_TRUTH_LABEL = "ground_truth_det"
 
 SUBSET_CLASS_MAP = {
@@ -46,6 +48,7 @@ def get_class_filter():
 
 def get_dataset(
         dataset_name: str = DATASET_NAME, dataset_dir: str = DATASET_DIR,
+        dataset_dir_16bit: str = DATASET_DIR_16BIT, use_16bit: bool = False,
         ground_truth_label: str = GROUND_TRUTH_LABEL, min_crop_size: int = 32,
         split=(0.9, 0.1)
 ):
@@ -56,7 +59,7 @@ def get_dataset(
         dataset = fo.load_dataset(dataset_name)
     else:
         dataset = fo.Dataset.from_dir(
-            dataset_dir=dataset_dir,
+            dataset_dir=dataset_dir if not use_16bit else dataset_dir_16bit,
             dataset_type=fo.types.FiftyOneDataset,
             name=dataset_name,
             label_field=ground_truth_label
@@ -64,11 +67,11 @@ def get_dataset(
 
     view = dataset.select_group_slices(['thermal_left', 'thermal_right'])
     # # set default filters for now
-    filters = [get_crop_size_filter(1), get_class_filter()]
+    filters = [get_crop_size_filter(32), get_class_filter()]
 
     for f in filters:
         view = view.filter_labels(GROUND_TRUTH_LABEL, f)
 
-    print('Imported', len(view), 'samples after applying filters.')
+    print('Imported', len(view), '16bit' if use_16bit else '8bit', 'samples after applying filters.')
     train_len, val_len = int(split[0] * len(view)), int(split[1] * len(view))
     return view.take(train_len), view.take(val_len)

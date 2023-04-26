@@ -397,7 +397,6 @@ also starting with DINO training implementation
 }
 ```
 
-
 ## 16.11.2022
 
 starting with implementation for dino training for cifar10, maybe imagenet-tiny afterwards
@@ -438,7 +437,6 @@ checking andrej karpathys training recipe for reference [link to his blog](http:
 idea: maybe i could use a existing or pre-trained model to label the data for the self supervised task?
 -> depends on the data and the model though
 
-
 ## 04.12.2022
 
 working on training with smaller convnexts (atto/femto)
@@ -448,6 +446,7 @@ working on training with smaller convnexts (atto/femto)
 retraining good performing older models on colab pro, implemented linear probing
 
 ## 11.01.2023
+
 training ViT/ConvNext
 trying to get data from Sea.ai fiftyone server, a lot of troubleshooting
 
@@ -471,7 +470,7 @@ will implement new pre-processing and data loading now, then try training with D
 i will also try to integrate contrastive loss and SimCLR into the training pipeline next
 
 for the CIFAR10 models, im still missing linear evaluation on the best ones, and then evaluation on CIFAR10-C
-prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100 
+prob will do ViT-Tiny, convnext_pico and mobilevitv3_small_100
 
 ## 18.01.2023
 
@@ -481,7 +480,6 @@ thinking about using fivecrop transform for DINO
 for the beginning only filter large detection crops as image and use those
 
 number of unique classes: 32 -> maybe i can use a reduced set of classes?
-
 
 ```shell
 {
@@ -537,9 +535,8 @@ made first training run with fiftyone integration, only KNN 0.05
 checking out first training results, when only training on detection boxes of sailing boats
 -> kNN accuracy of 5%, so doesnt look correct yet
 
-should i also add segmentation evaluation? and not only linear evaluation? 
+should i also add segmentation evaluation? and not only linear evaluation?
 also try out to integrate dino pre-trained feature weights and convnext with pre-trained feature weights
-
 
 ## 25.01.2023
 
@@ -657,4 +654,12 @@ trained with sailing20k and with massmind dataset and evaluated
 try stego training with labels
 try stego training with RGB 20k
 
+## 26.04.2023
 
+implemented dataloader for loading all crops instead of largest crop
+trying out dino/contrastive with new dataloder
+
+- [ ] also evaluate label acc/precision/f1 for supervised contrastive?
+- [ ] kNN accuracy, precision, recall, f1
+- [ ] implement focal loss? add to dino as loss term
+- [ ] plot confusion matrix

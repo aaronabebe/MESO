@@ -11,7 +11,8 @@ from torchvision.transforms import InterpolationMode
 
 from fo_utils import GROUND_TRUTH_LABEL, map_class_to_subset, SAILING_CLASSES_V1
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
-    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, CIFAR10_LABELS, FASHION_MNIST_LABELS
+    MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, CIFAR10_LABELS, FASHION_MNIST_LABELS, SAILING_MEAN, SAILING_STD, \
+    SAILING_16_STD, SAILING_16_MEAN
 
 
 def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = None, train: bool = True,
@@ -32,6 +33,8 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
     elif name == 'fashion-mnist':
         return _get_fashion_mnist(train, transforms, num_workers, subset, **kwargs)
     elif name == 'fiftyone':
+        return _get_fifty_one(transforms, num_workers, subset, **kwargs)
+    elif name == 'fiftyone-16':
         return _get_fifty_one(transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
@@ -56,33 +59,37 @@ def get_mean_std(dataset):
     elif dataset == 'fashion-mnist':
         return FASHION_MNIST_MEAN, FASHION_MNIST_STD
     elif dataset == 'fiftyone':
-        return FASHION_MNIST_MEAN, FASHION_MNIST_STD
-        # return MNIST_MEAN, MNIST_STD
-        # return SAILING_MEAN, SAILING_STD
+        return SAILING_MEAN, SAILING_STD
+    elif dataset == 'fiftyone-16':
+        return SAILING_16_MEAN, SAILING_16_STD
     raise NotImplementedError(f'No such dataset: {dataset}')
 
 
 def default_cifar10_transforms():
-    return default_transforms(CIFAR10_SIZE, *get_mean_std('cifar10'))
+    return default_resize_transforms(CIFAR10_SIZE, *get_mean_std('cifar10'))
 
 
 def default_mnist_transforms():
-    return default_transforms(CIFAR10_SIZE, *get_mean_std('mnist'))
+    return default_resize_transforms(CIFAR10_SIZE, *get_mean_std('mnist'))
 
 
 def default_fashion_mnist_transforms():
-    return default_transforms(CIFAR10_SIZE, *get_mean_std('fashion-mnist'))
+    return default_resize_transforms(CIFAR10_SIZE, *get_mean_std('fashion-mnist'))
 
 
 def default_fifty_one_transforms():
-    return default_transforms(224, *get_mean_std('fiftyone'))
+    return default_resize_transforms(224, *get_mean_std('fiftyone'))
 
 
-def default_transforms(input_size, mean=None, std=None):
+def default_resize_transforms(input_size, mean=None, std=None):
     t = [transforms.Resize((input_size, input_size)), transforms.ToTensor()]
     if mean or std:
         t.append(transforms.Normalize(mean=mean, std=std))
     return transforms.Compose(t)
+
+
+def default_empty_transforms():
+    return transforms.ToTensor()
 
 
 def _get_fashion_mnist(train: bool, transforms: torchvision.transforms, num_workers: int, subset: int,
@@ -118,7 +125,7 @@ def _get_mnist(train: bool, transforms: torchvision.transforms, num_workers: int
 def _get_fifty_one(transforms: torchvision.transforms, num_workers: int, subset: int, fo_dataset=None,
                    **kwargs) -> torch.utils.data.DataLoader:
     # load fifty one dataset
-    trainset = SailingLargestCropDataset(
+    trainset = SailingCropDataset(
         fo_dataset=fo_dataset,
         transform=transforms or default_fifty_one_transforms(),
     )
@@ -279,14 +286,96 @@ class SailingDataset(torch.utils.data.Dataset):
             img = Image.merge('RGB', (img, img, img))
             img = self.transform(img)
 
-        targets = []
+        targets = torch.zeros(len(self.classes))
         for detection in sample[self.ground_truth_label].detections:
-            targets.append(self.labels_map_rev[detection.label])
+            targets[self.labels_map_rev[detection.label]] = 1
 
         return img, targets
 
     def __len__(self):
         return len(self.samples)
+
+
+class SailingCropDataset(torch.utils.data.Dataset):
+    def __init__(
+            self,
+            fo_dataset,
+            transform: torchvision.transforms = None,
+            ground_truth_label: str = GROUND_TRUTH_LABEL,
+            use_16bit: bool = False,
+            use_class_subset: bool = False,
+    ):
+        self.samples = fo_dataset
+        self.sample_map = {}
+
+        running_idx = 0
+        for i, sample in enumerate(self.samples):
+            for j in range(len(sample[ground_truth_label].detections)):
+                self.sample_map[running_idx] = (i, j)
+                running_idx += 1
+
+        self.transforms = transform
+        self.img_paths = self.samples.values("filepath")
+        self.ground_truth_label = ground_truth_label
+        self.use_class_subset = use_class_subset
+        self.use_16bit = use_16bit
+
+        all_classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
+        if self.use_class_subset:
+            self.classes = {map_class_to_subset(c) for c in all_classes}
+        else:
+            self.classes = all_classes
+
+        self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
+
+    def __len__(self):
+        return sum(len(sample[self.ground_truth_label].detections) for sample in self.samples)
+
+    def __getitem__(self, idx):
+        img_path = self.img_paths[self.sample_map[idx][0]]
+        sample = self.samples[img_path]
+
+        if self.use_16bit:
+            img = Image.open(img_path).convert("I")
+        else:
+            img = Image.open(img_path).convert("L")
+
+        detection = sample[self.ground_truth_label].detections[self.sample_map[idx][1]]
+        width = sample.metadata.width
+        height = sample.metadata.height
+        crop_box = (
+            (width * detection.bounding_box[0]),
+            (height * detection.bounding_box[1]),
+            (width * detection.bounding_box[0]) + (width * detection.bounding_box[2]),
+            (height * detection.bounding_box[1]) + (height * detection.bounding_box[3])
+        )
+
+        try:
+            crop = img.crop(crop_box)
+        # sometimes annotations are from right to left, so coordinates order changes
+        except ValueError:
+            crop_box = (
+                (width * detection.bounding_box[0]),
+                (height * detection.bounding_box[1]) + (height * detection.bounding_box[3]),
+                (width * detection.bounding_box[0]) + (width * detection.bounding_box[2]),
+                (height * detection.bounding_box[1]),
+            )
+            crop = img.crop(crop_box)
+
+        if self.use_class_subset:
+            label = self.labels_map_rev[map_class_to_subset(detection.label)]
+        else:
+            label = self.labels_map_rev[detection.label]
+
+        if self.transforms:
+            if self.use_16bit:
+                crop = np.asarray(crop, dtype=np.float32) / 2 ** 16
+                crop = Image.fromarray(crop)
+
+            crop = Image.merge('RGB', (crop, crop, crop))
+            crop = self.transforms(crop)
+
+        return crop, label
 
 
 class SailingLargestCropDataset(torch.utils.data.Dataset):
@@ -295,6 +384,7 @@ class SailingLargestCropDataset(torch.utils.data.Dataset):
             fo_dataset,
             transform: torchvision.transforms = None,
             ground_truth_label: str = GROUND_TRUTH_LABEL,
+            use_16bit: bool = False,
             use_class_subset: bool = False,
     ):
         self.samples = fo_dataset
@@ -303,6 +393,7 @@ class SailingLargestCropDataset(torch.utils.data.Dataset):
         self.img_paths = self.samples.values("filepath")
         self.ground_truth_label = ground_truth_label
         self.use_class_subset = use_class_subset
+        self.use_16bit = use_16bit
 
         all_classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
         if self.use_class_subset:
@@ -318,7 +409,10 @@ class SailingLargestCropDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         img_path = self.img_paths[idx]
         sample = self.samples[img_path]
-        img = Image.open(img_path).convert("L")  # TODO handle 16bit and 8bit grayscale correctly while loading
+        if self.use_16bit:
+            img = Image.open(img_path).convert("I")
+        else:
+            img = Image.open(img_path).convert("L")
 
         # crop detection bounding box from image
         # for now i just crop out the largest detection per image
@@ -337,6 +431,7 @@ class SailingLargestCropDataset(torch.utils.data.Dataset):
                     (width * detection.bounding_box[0]) + (width * detection.bounding_box[2]),
                     (height * detection.bounding_box[1]) + (height * detection.bounding_box[3])
                 )
+
                 try:
                     crop = img.crop(crop_box)
                 # sometimes annotations are from right to left, so coordinates order changes
@@ -359,6 +454,10 @@ class SailingLargestCropDataset(torch.utils.data.Dataset):
 
         if self.transforms:
             # TODO make this generic for input channels
+            if self.use_16bit:
+                largest_crop = np.asarray(largest_crop, dtype=np.float32) / 2 ** 16
+                largest_crop = Image.fromarray(largest_crop)
+
             largest_crop = Image.merge('RGB', (largest_crop, largest_crop, largest_crop))
             largest_crop = self.transforms(largest_crop)
 

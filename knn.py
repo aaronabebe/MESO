@@ -23,9 +23,12 @@ def main(args):
     )
 
     _, train_loader_plain, val_loader_plain, _ = get_data_loaders(args)
-    knn_acc = compute_knn(model, train_loader_plain, val_loader_plain)
+    knn_acc, precision, recall, f1 = compute_knn(model, train_loader_plain, val_loader_plain)
     print('------------------------')
-    print(f'kNN accuracy: {knn_acc}')
+    print(f'kNN accuracy: \t\t {knn_acc}')
+    print(f'Precision: \t\t {precision}')
+    print(f'Recall: \t\t {recall}')
+    print(f'F1: \t\t {f1}')
 
 
 if __name__ == '__main__':
