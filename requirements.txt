@@ -13,3 +13,5 @@ pytest
 loss-landscapes==3.0.6
 grad-cam==1.4.0
 fiftyone==0.20.1
+wandb~=0.14.2
+tensorboard~=2.12.2
