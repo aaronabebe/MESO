@@ -565,3 +565,15 @@ mounting NAS in office to train on full dataset
 
 PTH:
 /mnt/fiftyoneDB/Database/Image_Data/Thermal_Images_8Bit/Trip_14_Seq_1/1286352_l.png
+
+## 15.04.2023
+
+setup stego training
+trained with sailing20k and with massmind dataset and evaluated
+
+## 19.04.2023
+
+try stego training with labels
+try stego training with RGB 20k
+
+
