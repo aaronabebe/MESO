@@ -113,10 +113,10 @@ def get_writer(args, sub_dir):
 def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_plain, val_loader_plain, writer,
                wandb, epoch, prefix):
     accuracy, precision, recall, f1 = compute_knn(model, train_loader_plain, val_loader_plain)
-    writer.add_scalar(f'{prefix}_knn_acc', accuracy, n_steps)
-    writer.add_scalar(f'{prefix}_knn_precision', precision, n_steps)
-    writer.add_scalar(f'{prefix}_knn_recall', recall, n_steps)
-    writer.add_scalar(f'{prefix}_knn_f1', f1, n_steps)
+    writer.add_scalar(f'eval/{prefix}_knn_acc', accuracy, n_steps)
+    writer.add_scalar(f'eval/{prefix}_knn_precision', precision, n_steps)
+    writer.add_scalar(f'eval/{prefix}_knn_recall', recall, n_steps)
+    writer.add_scalar(f'eval/{prefix}_knn_f1', f1, n_steps)
     if args.wandb:
         wandb.log({
             f'{prefix}_knn_acc': accuracy,

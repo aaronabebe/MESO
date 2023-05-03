@@ -4,8 +4,8 @@ import sys
 
 import torch
 import tqdm
-
 import wandb
+
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
 from models.models import get_model
@@ -172,11 +172,11 @@ def main(args):
                 for param_q, param_k in zip(student.parameters(), teacher.parameters()):
                     param_k.data.mul(m).add_((1 - m) * param_q.detach().data)
 
-            writer.add_scalar("train_loss", loss.item(), n_steps)
-            writer.add_scalar("epoch", epoch, n_steps)
-            writer.add_scalar("teacher_momentum", m, n_steps)
-            writer.add_scalar("lr", optim.param_groups[0]['lr'], n_steps)
-            writer.add_scalar("weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
+            writer.add_scalar("train/train_loss", loss.item(), n_steps)
+            writer.add_scalar("train/epoch", epoch, n_steps)
+            writer.add_scalar("train/teacher_momentum", m, n_steps)
+            writer.add_scalar("train/lr", optim.param_groups[0]['lr'], n_steps)
+            writer.add_scalar("train/weight_decay", optim.param_groups[0]['weight_decay'], n_steps)
             progress_bar.set_description(f"Loss: {loss.item():.2f}")
             if args.wandb:
                 wandb.log({

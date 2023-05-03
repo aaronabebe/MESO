@@ -660,6 +660,18 @@ implemented dataloader for loading all crops instead of largest crop
 trying out dino/contrastive with new dataloder
 
 - [ ] also evaluate label acc/precision/f1 for supervised contrastive?
-- [ ] kNN accuracy, precision, recall, f1
+- [x] kNN accuracy, precision, recall, f1
 - [ ] implement focal loss? add to dino as loss term
 - [ ] plot confusion matrix
+
+also started setting up thesis template
+
+## 03.05.2023
+
+wrote first version of thesis abstract + table of contents
+send consolidation )email to prof vincze
+
+
+
+
+
