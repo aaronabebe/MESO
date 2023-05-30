@@ -45,7 +45,7 @@ def calc_mean_std(loader: torch.utils.data.DataLoader):
 
 
 def main(args):
-    fo_dataset, _ = get_dataset(use_16bit=args.use_16bit)
+    fo_dataset, _ = get_dataset(dataset_dir=args.fo_dataset_dir, use_16bit=args.use_16bit)
     torch_dataset = SailingLargestCropDataset(fo_dataset, transform=default_empty_transforms(),
                                               use_16bit=args.use_16bit)
     if args.mean_std:

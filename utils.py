@@ -127,6 +127,8 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--visualize", type=str, choices=['dino_attn', 'dino_proj', 'dino_augs', 'grad_cam', 'tsne'],
                         help="Visualize the model during the training.")
     parser.add_argument("--img_path", type=str, help="Path override for image for visualization.")
+    parser.add_argument("--fo_dataset_dir", type=str, help="Path to fiftyone dataset.",
+                        default="/home/aaron/dev/data/20000_sample_aaron")
     return parser.parse_args()
 
 

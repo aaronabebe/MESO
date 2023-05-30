@@ -94,6 +94,7 @@ def get_base_test_args():
         out_dim=1024,
         patch_size=4,
         resume=False,
+        fo_dataset_dir='/home/aaron/dev/data/20000_sample_aaron',
         sam=False,
         scheduler=None,
         seed=420,

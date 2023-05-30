@@ -9,7 +9,7 @@ from torch.utils.data import RandomSampler, Subset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
-from fo_utils import GROUND_TRUTH_LABEL, map_class_to_subset, SAILING_CLASSES_V1
+from fo_utils import GROUND_TRUTH_LABEL, map_class_to_subset, SAILING_CLASSES_SUBSET_V1
 from utils import CIFAR_10_CORRUPTIONS, DEFAULT_DATA_DIR, CIFAR10_MEAN, CIFAR10_STD, CIFAR10_SIZE, MNIST_STD, \
     MNIST_MEAN, FASHION_MNIST_STD, FASHION_MNIST_MEAN, CIFAR10_LABELS, FASHION_MNIST_LABELS, SAILING_MEAN, SAILING_STD, \
     SAILING_16_STD, SAILING_16_MEAN
@@ -47,7 +47,7 @@ def get_class_labels(dataset_name):
     elif dataset_name == 'fashion-mnist':
         return FASHION_MNIST_LABELS
     elif dataset_name == 'fiftyone':
-        return SAILING_CLASSES_V1
+        return SAILING_CLASSES_SUBSET_V1
     raise NotImplementedError(f'No such dataset: {dataset_name}')
 
 
@@ -256,44 +256,6 @@ class CIFAR10CDataset(torchvision.datasets.VisionDataset):
 
     def __len__(self):
         return len(self.data)
-
-
-class SailingDataset(torch.utils.data.Dataset):
-    def __init__(
-            self,
-            fo_dataset,
-            transform: torchvision.transforms = None,
-            ground_truth_label: str = GROUND_TRUTH_LABEL,
-    ):
-        self.transform = transform
-        self.samples = fo_dataset
-
-        self.transforms = transform
-        self.img_paths = self.samples.values("filepath")
-        self.ground_truth_label = ground_truth_label
-
-        all_classes = self.samples.distinct(f'{self.ground_truth_label}.detections.label')
-        self.classes = all_classes
-
-        self.labels_map_rev = {c: i for i, c in enumerate(self.classes)}
-
-    def __getitem__(self, idx):
-        img_path = self.img_paths[idx]
-        sample = self.samples[img_path]
-        img = Image.open(img_path).convert("L")  # TODO handle 16bit and 8bit grayscale correctly while loading
-
-        if self.transform is not None:
-            img = Image.merge('RGB', (img, img, img))
-            img = self.transform(img)
-
-        targets = torch.zeros(len(self.classes))
-        for detection in sample[self.ground_truth_label].detections:
-            targets[self.labels_map_rev[detection.label]] = 1
-
-        return img, targets
-
-    def __len__(self):
-        return len(self.samples)
 
 
 class SailingCropDataset(torch.utils.data.Dataset):

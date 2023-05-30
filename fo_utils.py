@@ -1,10 +1,14 @@
+import sys
+
+# this is needed for fiftyone dataset import to work
+sys.path.append("/home/aaron/dev/SSL_MFE")
+
 import fiftyone as fo
 from fiftyone import ViewField as F
 
 DATASET_NAME = "SAILING_DATASET"
-DATASET_DIR = "/home/aaron/dev/data/20000_sample_aaron"
-# DATASET_DIR = "/mnt/fiftyoneDB/Database/Annotation_Data/SAILING_DATASET"
 DATASET_DIR_16BIT = "/home/aaron/dev/data/data_16bit"
+# DATASET_DIR = "/mnt/fiftyoneDB/Database/Annotation_Data/SAILING_DATASET"
 GROUND_TRUTH_LABEL = "ground_truth_det"
 
 SUBSET_CLASS_MAP = {
@@ -18,7 +22,15 @@ SUBSET_CLASS_MAP = {
     "WATER_OBJECTS": ["ALGAE", "FLOTSAM", "HORIZON", "OBJECT_REFLECTION", "SUN_REFLECTION", "UNKNOWN", "WATERTRACK"]
 }
 
-SAILING_CLASSES_V1 = (
+SAILING_CLASSES_TOTAL = (
+    'ALGAE', 'BIRD', 'BOAT', 'BOAT_WITHOUT_SAILS', 'BUOY', 'CONSTRUCTION', 'CONTAINER', 'CONTAINER_SHIP', 'CRUISE_SHIP',
+    'DOLPHIN', 'FAR_AWAY_OBJECT', 'FISHING_BUOY', 'FISHING_SHIP', 'FLOTSAM', 'HARBOUR_BUOY', 'HORIZON', 'HUMAN',
+    'HUMAN_IN_WATER', 'HUMAN_ON_BOARD', 'KAYAK', 'LEISURE_VEHICLE', 'MARITIME_VEHICLE', 'MOTORBOAT',
+    'OBJECT_REFLECTION', 'SAILING_BOAT', 'SAILING_BOAT_WITH_CLOSED_SAILS', 'SAILING_BOAT_WITH_OPEN_SAILS', 'SEAGULL',
+    'SHIP', 'SUN_REFLECTION', 'UNKNOWN', 'WATERTRACK'
+)
+
+SAILING_CLASSES_SUBSET_V1 = (
     "BOAT", "BOAT_WITHOUT_SAILS", "CONSTRUCTION", "CONTAINER_SHIP", "CRUISE_SHIP", "FAR_AWAY_OBJECT",
     "FISHING_SHIP", "HARBOUR_BUOY", "MARITIME_VEHICLE", "MOTORBOAT", "SAILING_BOAT", "SAILING_BOAT_WITH_CLOSED_SAILS",
     "SAILING_BOAT_WITH_OPEN_SAILS", "SHIP", "WATERTRACK"
@@ -43,13 +55,14 @@ def get_crop_size_filter(min_crop_size: int = 32):
 
 
 def get_class_filter():
-    return F("label").is_in(SAILING_CLASSES_V1)
+    return F("label").is_in(SAILING_CLASSES_SUBSET_V1)
 
 
 def get_dataset(
-        dataset_name: str = DATASET_NAME, dataset_dir: str = DATASET_DIR,
+        dataset_dir: str,
+        dataset_name: str = DATASET_NAME,
         dataset_dir_16bit: str = DATASET_DIR_16BIT, use_16bit: bool = False,
-        ground_truth_label: str = GROUND_TRUTH_LABEL, min_crop_size: int = 32,
+        ground_truth_label: str = GROUND_TRUTH_LABEL, min_crop_size: int = 1,
         split=(0.9, 0.1)
 ):
     # this needs to be set to load custom datatypes
@@ -66,8 +79,9 @@ def get_dataset(
         )
 
     view = dataset.select_group_slices(['thermal_left', 'thermal_right'])
+
     # # set default filters for now
-    filters = [get_crop_size_filter(32), get_class_filter()]
+    filters = [get_crop_size_filter(min_crop_size), get_class_filter()]
 
     for f in filters:
         view = view.filter_labels(GROUND_TRUTH_LABEL, f)

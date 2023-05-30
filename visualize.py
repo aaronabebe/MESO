@@ -213,11 +213,7 @@ def dino_simple_projection(args, model, patch_size, data, plot=True, path=None, 
     ).reshape(1, 5, 1, 2)
 
     feat = model.get_intermediate_layers(img)[0]
-    print('feat', feat.shape)
     feats1 = feat[:, 1:, :].reshape(feat.shape[0], h_featmap, w_featmap, -1).permute(0, 3, 1, 2)
-    print('feats1', feats1.shape)
-    print('query_points', query_points.shape)
-    print('query_points', query_points.permute(0, 2, 1, 3).shape)
 
     sfeats1 = F.grid_sample(feats1, query_points.permute(0, 2, 1, 3), padding_mode='border', align_corners=True)
 
@@ -227,9 +223,6 @@ def dino_simple_projection(args, model, patch_size, data, plot=True, path=None, 
 
     heatmap_intra = F.interpolate(
         attn_intra, img.shape[2:], mode="bilinear", align_corners=True).squeeze(0).detach().cpu()
-
-    print('heatmap_intra', heatmap_intra.shape)
-    print(heatmap_intra)
 
     colors = np.array([
         [128, 0, 0],
@@ -346,7 +339,7 @@ def main(args):
     if args.img_path is None:
         fo_dataset = None
         if args.dataset == 'fiftyone':
-            fo_dataset, _ = get_dataset()
+            fo_dataset, _ = get_dataset(dataset_dir=args.fo_dataset_dir)
         dl = get_dataloader(
             args.dataset,
             transforms=transforms,

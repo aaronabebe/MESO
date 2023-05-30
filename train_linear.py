@@ -55,7 +55,7 @@ def main(args: argparse.Namespace):
     linear_classifier = linear_classifier.to(device)
 
     if args.dataset == 'fiftyone':
-        train_data, val_data = get_dataset()
+        train_data, val_data = get_dataset(dataset_dir=args.fo_dataset_dir)
         train_loader = get_dataloader(
             args.dataset,
             fo_dataset=train_data,

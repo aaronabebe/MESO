@@ -30,7 +30,7 @@ def get_data_loaders(args):
     )
 
     if args.dataset == 'fiftyone':
-        train_data, val_data = get_dataset()
+        train_data, val_data = get_dataset(dataset_dir=args.fo_dataset_dir)
         train_loader = get_dataloader(
             args.dataset, transforms=train_transforms, fo_dataset=train_data,
             num_workers=args.num_workers,

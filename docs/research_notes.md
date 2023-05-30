@@ -671,6 +671,11 @@ also started setting up thesis template
 wrote first version of thesis abstract + table of contents
 send consolidation )email to prof vincze
 
+## 24.05.2023
+
+test and prepare repo for handover
+
+
 
 
 

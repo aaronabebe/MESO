@@ -59,11 +59,11 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
             print('No pretrained model found. Starting with uninitialized weights.')
             return model
 
-        ckpt = torch.load(path_override, map_location=device)
+    ckpt = torch.load(path_override, map_location=device)
 
-        model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
-        model.eval()
-        return model
+    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
+    model.eval()
+    return model
 
 
 @register_model
