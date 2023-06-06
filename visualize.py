@@ -88,7 +88,15 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
     embs, _, labels = compute_embeddings(model, data_loader)
 
     fig, ax = plt.subplots()
-    tsne = TSNE(n_components=2, random_state=123, verbose=1 if plot else 0, init='pca', learning_rate='auto')
+    tsne = TSNE(
+        n_components=2,
+        random_state=123,
+        verbose=1 if plot else 0,
+        init='pca',
+        perplexity=30,
+        n_iter=1000,
+        learning_rate='auto'
+    )
     z = tsne.fit_transform(embs)
 
     class_names = get_class_labels(args.dataset)

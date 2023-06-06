@@ -166,12 +166,12 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
 
     arrays = {k: np.concatenate(l) for k, l in lists.items()}
 
-    estimator = KNeighborsClassifier(algorithm='ball_tree')
+    estimator = KNeighborsClassifier(algorithm='ball_tree', n_jobs=-1,
+                                     n_neighbors=5)  # TODO evaluate model with different neighbors, eg 20
     estimator.fit(arrays["X_train"], arrays["y_train"])
     y_val_pred = estimator.predict(arrays["X_val"])
 
     acc = accuracy_score(arrays["y_val"], y_val_pred)
-    precision, recall, f1, _ = precision_recall_fscore_support(arrays["y_val"], y_val_pred,
+    precision, recall, f1, _ = precision_recall_fscore_support(arrays["y_val"], y_val_pred, zero_division=0,
                                                                average='weighted')  # TODO maybe change to macro
-
     return acc, precision, recall, f1

@@ -59,6 +59,7 @@ def main(args):
     teacher.load_state_dict(student.state_dict())
     for param in teacher.parameters():
         param.requires_grad = False
+
     print("=> Dataloaders, student and teacher ready.")
     print(
         "=> Number of parameters of student: {:.2f}M".format(sum(p.numel() for p in student.parameters()) / 1000000.0))
@@ -118,7 +119,7 @@ def main(args):
     n_steps = start_epoch * args.batch_size
 
     for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
-        if args.eval:
+        if args.eval and epoch % args.eval_freq == 0:
             student.eval()
             teacher_knn_acc = eval_model(args, example_viz_img, n_steps, output_dir, student.backbone,
                                          train_loader_plain, val_loader_plain, writer, wandb, epoch, prefix='teacher')

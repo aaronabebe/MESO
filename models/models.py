@@ -59,6 +59,7 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
             print('No pretrained model found. Starting with uninitialized weights.')
             return model
 
+    print(f'Loading model from {path_override}')
     ckpt = torch.load(path_override, map_location=device)
 
     model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
@@ -82,6 +83,12 @@ def vit_tiny(pretrained=False, patch_size=4, **kwargs):
         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
     return model
 
+@register_model
+def vit_pico(pretrained=False, patch_size=4, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size, embed_dim=96, depth=9, num_heads=3, mlp_ratio=2,
+        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
 
 @register_model
 def vit_small(patch_size=16, pretrained=False, **kwargs):

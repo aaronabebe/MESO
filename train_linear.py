@@ -106,7 +106,8 @@ def main(args: argparse.Namespace):
         if args.eval:
             linear_classifier.eval()
             with torch.no_grad():
-                acc1s, acc5s = [], []
+                accs, precisions, recalls, f1s = [], [], [], []
+                losses = []
                 progress_bar = tqdm.auto.tqdm(enumerate(val_loader), desc=" val batches", position=1, leave=False,
                                               total=len(val_loader.dataset) // args.batch_size)
                 for it, (images, labels) in progress_bar:
@@ -119,29 +120,37 @@ def main(args: argparse.Namespace):
                             output = model(images)
                     output = linear_classifier(output)
                     loss = nn.CrossEntropyLoss()(output, labels)
-                    if linear_classifier.num_labels >= 5:
-                        acc1, acc5 = eval_accuracy(output, labels, topk=(1, 5))
-                    else:
-                        acc1, = eval_accuracy(output, labels, topk=(1,))
-                    acc1s.append(acc1)
-                    acc5s.append(acc5)
-                    writer.add_scalar("val/loss", loss.item(), n_steps)
-                    if args.wandb:
-                        wandb.log({"val/loss": loss.item()})
-                    n_steps += 1
+                    losses.append(loss.item())
 
-                acc1 = torch.mean(torch.stack(acc1s))
-                acc5 = torch.mean(torch.stack(acc5s))
+                    acc, precision, recall, f1 = eval_accuracy(output.detach().cpu(), labels.detach().cpu())
+                    accs.append(torch.as_tensor(acc))
+                    precisions.append(torch.as_tensor(precision))
+                    recalls.append(torch.as_tensor(recall))
+                    f1s.append(torch.as_tensor(f1))
 
-                writer.add_scalar("val/acc1", acc1, n_steps)
-                writer.add_scalar("val/acc5", acc5, n_steps)
+                acc = torch.mean(torch.stack(accs))
+                precision = torch.mean(torch.stack(precisions))
+                recall = torch.mean(torch.stack(recalls))
+                f1 = torch.mean(torch.stack(f1s))
+                loss = torch.mean(torch.as_tensor(losses))
+
+                writer.add_scalar("val/acc", acc, n_steps)
+                writer.add_scalar("val/precision", precision, n_steps)
+                writer.add_scalar("val/recall", recall, n_steps)
+                writer.add_scalar("val/f1", f1, n_steps)
+                writer.add_scalar("val/loss", loss, n_steps)
+
                 if args.wandb:
-                    wandb.log({"val/acc1": acc1, "val/acc5": acc5})
+                    wandb.log({
+                        "val/loss": loss,
+                        "val/acc": acc,
+                        "val/precision": precision,
+                        "val/recall": recall,
+                        "val/f1": f1,
+                    })
 
-                print(f"acc1: {acc1:.2f} acc5: {acc5:.2f}")
-
-                if acc1 > best_acc:
-                    best_acc = acc1
+                if acc > best_acc:
+                    best_acc = acc
                     torch.save(linear_classifier.state_dict(), f"{output_dir}/best.pth")
                     save_dict = {
                         "epoch": epoch + 1,
@@ -157,7 +166,7 @@ def main(args: argparse.Namespace):
                         artifact.add_file(save_path)
                         wandb.log_artifact(artifact)
 
-                    best_acc = acc1
+                    best_acc = acc
 
             linear_classifier.train()
 
@@ -176,9 +185,16 @@ def main(args: argparse.Namespace):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            writer.add_scalar("train_loss", loss.item(), n_steps)
-            writer.add_scalar("epoch", epoch, n_steps)
-            writer.add_scalar("lr", optimizer.param_groups[0]['lr'], n_steps)
+
+            # count acc
+            acc = eval_accuracy(output.detach().cpu(), labels.detach().cpu())[0]
+            accs.append(torch.as_tensor(acc))
+
+            writer.add_scalar("train/train_loss", loss.item(), n_steps)
+            writer.add_scalar("train/epoch", epoch, n_steps)
+            writer.add_scalar("train/lr", optimizer.param_groups[0]['lr'], n_steps)
+            writer.add_scalar("train/acc", acc, n_steps)
+
             progress_bar.set_description(f"loss: {loss.item():.2f}")
             if args.wandb:
                 wandb.log({

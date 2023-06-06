@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import tqdm
+from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
@@ -57,28 +58,28 @@ CIFAR100_LABELS = (
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Run training for different ML experiments')
-    parser.add_argument("--batch_size", type=int, default=128, help="Batch size.")
+    parser.add_argument("--batch_size", type=int, default=512, help="Batch size.")
     parser.add_argument("--epochs", type=int, default=100, help="Number of epochs.")
     parser.add_argument("--dataset", type=str, default='cifar10', help="Dataset to use.")
     parser.add_argument("--train_subset", type=int, default=-1, help="Subset of dataset for training.")
     parser.add_argument("--test_subset", type=int, default=-1,
                         help="Subset of dataset for faster testing and evaluation (Default 2000)")
-    parser.add_argument("--model", type=str, default='resnet50_cifar10', help="Model to use.")
+    parser.add_argument("--model", type=str, default='mobilenetv3_small_100', help="Model to use.")
     parser.add_argument("--ckpt_path", type=str, help="Override for default model loading dir when loading a model.")
     parser.add_argument("--compare", type=str, help="Compare visualizations of model with this model.")
 
-    parser.add_argument("--input_size", type=int, default=32, help="Size of the input images.")
+    parser.add_argument("--input_size", type=int, default=64, help="Size of the input images.")
     parser.add_argument("--input_channels", type=int, default=3, help="Number of channels in the input images.")
     parser.add_argument("--num_classes", type=int, default=0, help="Number of classes in the dataset. (Defaults to 0)")
     parser.add_argument("--patch_size", type=int, default=4, help="Patch size for ViT.")
-    parser.add_argument('--norm_last_layer', default=False, action='store_true',
+    parser.add_argument('--norm_last_layer', default=True, action='store_true',
                         help="""Whether or not to weight normalize the last layer of the DINO head.
         Not normalizing leads to better performance but can make the training unstable.
         In our experiments, we typically set this paramater to False with vit_small and True with vit_base.""")
 
     parser.add_argument("--out_dim", type=int, default=1024, help="Size of DINO MLPHead hidden layer output dims")
     parser.add_argument("--n_local_crops", type=int, default=8, help="Number of local crops for DINO augmentation.")
-    parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.2, 0.5),
+    parser.add_argument("--local_crops_scale", type=float, nargs='+', default=(0.4, 0.5),
                         help="Scale of local crops for DINO augmentation.")
     parser.add_argument("--local_crop_input_factor", type=int, default=2,
                         help="Factor by which the local crops are divided. (Default 2)")
@@ -102,24 +103,23 @@ def get_args() -> argparse.Namespace:
     parser.add_argument("--warmup_epochs", default=10, type=int,
                         help="Number of epochs for the linear learning-rate warm up.")
 
-    parser.add_argument("--optimizer", type=str, default='adamw', choices=['sgd', 'adam', 'adamw', 'lars'],
+    parser.add_argument("--optimizer", type=str, default='lars', choices=['sgd', 'adam', 'adamw', 'lars'],
                         help="Optimizer to use.")
-    parser.add_argument("--sam", action='store_true', default=False,
-                        help='Use SAM in conjunction with standard chosen optimizer.')
-    parser.add_argument("--learning_rate", type=float, default=0.0001, help="Learning rate.")
+    parser.add_argument("--learning_rate", type=float, default=1e-4, help="Learning rate.")
     parser.add_argument('--min_lr', type=float, default=1e-6, help="""Target LR at the
         end of optimization. We use a cosine LR schedule with linear warmup.""")
     parser.add_argument("--momentum", type=float, default=0.9, help="Momentum when training with SGD as optimizer.")
-    parser.add_argument("--weight_decay", type=float, default=0.04, help="Weight decay for optimizer")
-    parser.add_argument('--weight_decay_end', type=float, default=0.4, help="""Final value of the
+    parser.add_argument("--weight_decay", type=float, default=1e-5, help="Weight decay for optimizer")
+    parser.add_argument('--weight_decay_end', type=float, default=1e-5, help="""Final value of the
         weight decay. We use a cosine schedule for WD and using a larger decay by
         the end of training improves performance for ViTs.""")
 
     parser.add_argument("--method", type=str, default='simclr', choices=['dino', 'supcon', 'simclr'])
     parser.add_argument("--device", type=str, default='cuda', help="Device to use.")  # mps = mac m1 device
     parser.add_argument("--seed", type=int, default=420, help="Fixed seed for torch/numpy/python")
-    parser.add_argument("--num_workers", type=int, default=1, help="Number of dataloader workers.")
-    parser.add_argument("--eval", action='store_true', default=False, help='Evaluate model during training.')
+    parser.add_argument("--num_workers", type=int, default=10, help="Number of dataloader workers.")
+    parser.add_argument("--eval", action='store_true', default=True, help='Evaluate model during training.')
+    parser.add_argument("--eval_freq", type=int, default=10, help="Evaluate model every n epochs.")
     parser.add_argument("--resume", action='store_true', default=False,
                         help='Try to resume training from last checkpoint.')
     parser.add_argument("--wandb", action='store_true', default=False, help='Log training run to Weights & Biases.')
@@ -166,24 +166,12 @@ def get_latest_model_path(name):
     return ckpt_path
 
 
-def eval_accuracy(output, target, topk=(1, 5)):
+def eval_accuracy(output, target):
+    _, preds = torch.max(output, dim=1)
     with torch.no_grad():
-        maxk = max(topk)
-        batch_size = target.size(0)
-
-        _, pred = output.topk(maxk, dim=1)  # top-k index: size (B, k)
-        pred = pred.t()  # size (k, B)
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
-
-        acc = []
-        for k in topk:
-            correct_k = correct[:k].float().sum()
-            acc.append(correct_k * 100.0 / batch_size)
-
-        if len(acc) == 1:
-            return acc[0]
-        else:
-            return acc
+        acc = accuracy_score(target, preds)
+        precision, recall, f1, _ = precision_recall_fscore_support(target, preds, average='weighted', zero_division=0)
+        return acc, precision, recall, f1
 
 
 class LARS(torch.optim.Optimizer):

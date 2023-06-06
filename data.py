@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+from timm.data import ImageDataset
 from torch.utils.data import RandomSampler, Subset
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
@@ -36,6 +37,8 @@ def get_dataloader(name: str, subset: int, transforms: torchvision.transforms = 
         return _get_fifty_one(transforms, num_workers, subset, **kwargs)
     elif name == 'fiftyone-16':
         return _get_fifty_one(transforms, num_workers, subset, **kwargs)
+    elif name == 'massmind':
+        return _get_massmind(transforms, num_workers, subset, **kwargs)
     raise NotImplementedError(f'No such dataloader: {name}')
 
 
@@ -163,6 +166,11 @@ def _get_cifar10(train: bool, transforms: torchvision.transforms, num_workers: i
     return torch.utils.data.DataLoader(
         trainset, shuffle=True, num_workers=num_workers, **kwargs
     )
+
+
+def _get_massmind(transforms: torchvision.transforms, num_workers: int, subset: int, **kwargs):
+    # TODO implement this properly
+    raise NotImplementedError
 
 
 def flip_and_color_jitter():
