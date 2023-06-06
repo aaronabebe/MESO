@@ -676,6 +676,18 @@ send consolidation )email to prof vincze
 test and prepare repo for handover
 
 
+## 31.05.2023
+
+continue writing, lay down more detailed sections for methodology
+
+loss landscape facts: 
+
+random projections for dimensionality reduction work because of so called
+Johnson–Lindenstrauss lemma
+
+WHAT SHAPES THE LOSS LANDSCAPE OF SELF SUPERVISED LEARNING?
+https://openreview.net/pdf?id=3zSn48RUO8M
+
 
 
 
