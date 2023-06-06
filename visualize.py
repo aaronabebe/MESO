@@ -69,7 +69,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
         path = f"./plots/grad_cam"
 
     os.makedirs(path, exist_ok=True)
-    fig.savefig(f"{path}/{time.ctime()}_grads.svg")
+    fig.savefig(f"{path}/{time.ctime()}_grads.png")
 
     if plot:
         plt.show()
@@ -117,7 +117,7 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
 
     fig.tight_layout()
     os.makedirs(path, exist_ok=True)
-    fig.savefig(f"{path}/{time.ctime()}_tsne.svg")
+    fig.savefig(f"{path}/{time.ctime()}_tsne.png")
 
     if plot:
         plt.show()
@@ -186,7 +186,7 @@ def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_
                 path = f"./plots/dino_attn"
 
             os.makedirs(path, exist_ok=True)
-            fig.savefig(f"{path}/{time.ctime()}_attention.svg")
+            fig.savefig(f"{path}/{time.ctime()}_attention.png")
 
             if plot:
                 plt.show()
@@ -265,7 +265,7 @@ def dino_simple_projection(args, model, patch_size, data, plot=True, path=None, 
         path = f"./plots/dino_simple_projection"
 
     os.makedirs(path, exist_ok=True)
-    fig.savefig(f"{path}/{time.ctime()}.svg")
+    fig.savefig(f"{path}/{time.ctime()}.png")
 
     if plot:
         plt.show()
@@ -296,7 +296,7 @@ def dino_augmentations(args, data):
     fig.tight_layout()
     sub_dir_name = 'dino_augs'
     os.makedirs(f'./plots/data/{sub_dir_name}', exist_ok=True)
-    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_augs.svg")
+    fig.savefig(f"./plots/data/{sub_dir_name}/{time.time()}_augs.png")
     plt.show()
 
 
