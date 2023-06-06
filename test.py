@@ -44,7 +44,7 @@ def main(args: argparse.Namespace):
 
                 y_hat = model(x)
                 loss = F.cross_entropy(y_hat, y)
-                acc, _ = eval_accuracy(y_hat, y, topk=(1, 5))
+                acc, precision, recall, f1 = eval_accuracy(y_hat, y, topk=(1, 5))
 
                 accs.append(acc.item())
                 losses.append(loss.item())

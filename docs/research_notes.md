@@ -657,6 +657,7 @@ try stego training with RGB 20k
 ## 26.04.2023
 
 implemented dataloader for loading all crops instead of largest crop
+
 trying out dino/contrastive with new dataloder
 
 - [ ] also evaluate label acc/precision/f1 for supervised contrastive?
@@ -676,7 +677,39 @@ send consolidation )email to prof vincze
 test and prepare repo for handover
 
 
+## 31.05.2023
+
+## 02.06.2023
+
+prepare everything on new pc
+train small dino mobilenet with cifar
+try out loss landscapes
+
+## 03.06.2023
+
+revisit linear eval
+retrain convnext tiny dino
+
+## 05.06.2023
+
+convnext tiny train run died after 500 epochs, because of matplotlib memory error
+restart training with convnext atto to compare
+then try out vit pico configuration 
+
+-> linear finetune convnext tiny
+
+train on sailing dataset
+train on massmind dataset and evaluate on sailing?
+
+tomorrow implement massmind data loading and cropping?
+also continue writing thesis
 
 
+## 06.06.2023
+
+writing on thesis methodology
+try out knn with more neighbors, 20
+try out tsne with different learning rate, 250
+try out tsne with different perplexity, 20
 
 
