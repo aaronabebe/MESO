@@ -285,7 +285,7 @@ def dino_augmentations(args, data):
     data = data[0]
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]) - 1)
-    cropped_images = [s[random_choice] for s in data]
+    cropped_images = [s for s in data[random_choice]]
 
     n = int(np.ceil(len(cropped_images) ** .5))
     fig, axs = plt.subplots(n, n, figsize=(n * 3, n * 3))
@@ -311,10 +311,10 @@ def load_example_viz_image(image_path, input_channels, dataset, transforms):
         else:
             img = img.convert('RGB')
 
-    img = transforms(img)
+    imgs = transforms(img)
 
     # add two 0 dims to match dataloader batch
-    data = torch.as_tensor(img)
+    data = torch.stack(imgs)
     data = data.unsqueeze(0)
     data = data.unsqueeze(0)
     return data
@@ -337,7 +337,9 @@ def main(args):
         transforms = DinoTransforms(
             args.input_size, args.input_channels,
             args.n_local_crops, args.local_crops_scale,
-            args.global_crops_scale, mean=mean, std=std
+            args.global_crops_scale,
+            local_crop_input_factor=args.local_crop_input_factor,
+            mean=mean, std=std
         )
     else:
         # use default transforms per dataset
@@ -361,18 +363,19 @@ def main(args):
         data = load_example_viz_image(args.img_path, args.input_channels, args.dataset, transforms)
 
     # model
-    model = get_eval_model(
-        args.model,
-        args.device,
-        args.dataset,
-        path_override=args.ckpt_path,
-        in_chans=args.input_channels,
-        num_classes=args.num_classes,
-        patch_size=args.patch_size if is_timm_compatible(args.model) else None,
-        img_size=args.input_size if is_timm_compatible(args.model) else None,
-        load_remote=args.wandb,
-        pretrained=args.timm
-    )
+    if not args.visualize == 'dino_augs':
+        model = get_eval_model(
+            args.model,
+            args.device,
+            args.dataset,
+            path_override=args.ckpt_path,
+            in_chans=args.input_channels,
+            num_classes=args.num_classes,
+            patch_size=args.patch_size if is_timm_compatible(args.model) else None,
+            img_size=args.input_size if is_timm_compatible(args.model) else None,
+            load_remote=args.wandb,
+            pretrained=args.timm
+        )
 
     # viz
     if args.visualize == 'dino_attn':
