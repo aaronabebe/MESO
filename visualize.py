@@ -288,7 +288,7 @@ def dino_augmentations(args, data):
     cropped_images = [s for s in data[random_choice]]
 
     n = int(np.ceil(len(cropped_images) ** .5))
-    fig, axs = plt.subplots(n, n, figsize=(n * 3, n * 3))
+    fig, axs = plt.subplots(n, n, figsize=(n * 2, n * 2))
     for i, img in enumerate(cropped_images):
         ax = axs[i // n][i % n]
         ax.imshow(reshape_for_plot(img, mean[0], std[0]))
@@ -336,9 +336,9 @@ def main(args):
         mean, std = get_mean_std(args.dataset)
         transforms = DinoTransforms(
             args.input_size, args.input_channels,
-            args.n_local_crops, args.local_crops_scale,
+            7, args.local_crops_scale,
             args.global_crops_scale,
-            local_crop_input_factor=args.local_crop_input_factor,
+            local_crop_input_factor=1,
             mean=mean, std=std
         )
     else:
