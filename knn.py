@@ -19,7 +19,8 @@ def main(args):
         patch_size=args.patch_size if is_timm_compatible(args.model) else None,
         img_size=args.input_size if is_timm_compatible(args.model) else None,
         load_remote=args.wandb,
-        pretrained=args.timm
+        pretrained=args.timm,
+        _remove_head=args.ckpt_path
     )
 
     _, train_loader_plain, val_loader_plain, _ = get_data_loaders(args)

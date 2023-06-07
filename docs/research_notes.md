@@ -732,6 +732,19 @@ Precision:               0.5283266019296734
 Recall:                  0.5229
 F1:              0.51355132836184
 
+- [ ] TODO fix loss landscape for convnext models
+
+thesis
+- [ ] attention viz section
+- [ ] feature correspondence section
+- [ ] data aug section
+- [ ] knowledge distillation section
+- [ ] parameter tuning and model selection section
+- [ ] methodology introduction problems and issues
+- [ ] 
+- [ ] 
+- [ ] 
+
 
 
 

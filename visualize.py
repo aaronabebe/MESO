@@ -93,9 +93,9 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
         random_state=123,
         verbose=1 if plot else 0,
         init='pca',
-        perplexity=20,
+        perplexity=30,
         n_iter=5000,
-        learning_rate=10
+        learning_rate=50
     )
     z = tsne.fit_transform(embs)
 
@@ -374,7 +374,8 @@ def main(args):
             patch_size=args.patch_size if is_timm_compatible(args.model) else None,
             img_size=args.input_size if is_timm_compatible(args.model) else None,
             load_remote=args.wandb,
-            pretrained=args.timm
+            pretrained=args.timm,
+            _remove_head=args.ckpt_path
         )
 
     # viz

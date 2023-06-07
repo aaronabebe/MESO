@@ -22,7 +22,7 @@ def get_model(name: str, **kwargs) -> torch.nn.Module:
 
 
 def get_eval_model(name: str, device: torch.device, dataset: str, path_override=None, load_remote: bool = False,
-                   pretrained: bool = False, **kwargs) -> torch.nn.Module:
+                   pretrained: bool = False, _remove_head: bool = False, **kwargs) -> torch.nn.Module:
     """
     Returns a self trained model from the local model directory.
     :return:
@@ -63,8 +63,9 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
     ckpt = torch.load(path_override, map_location=device)
 
     model.load_state_dict(remove_prefix(ckpt['student'], 'backbone.'), strict=False)
-    remove_head(model)
     model.eval()
+    if _remove_head:
+        remove_head(model)
     return model
 
 
@@ -78,7 +79,7 @@ def vit_tiny_cifar10(pretrained=False, **kwargs):
 
 
 @register_model
-def vit_tiny(pretrained=False, patch_size=4, **kwargs):
+def vit_tiny_slow_attn(pretrained=False, patch_size=4, **kwargs):
     model = VisionTransformer(
         patch_size=patch_size, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
         qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
