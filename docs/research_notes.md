@@ -679,6 +679,16 @@ test and prepare repo for handover
 
 ## 31.05.2023
 
+continue writing, lay down more detailed sections for methodology
+
+loss landscape facts: 
+
+random projections for dimensionality reduction work because of so called
+Johnson–Lindenstrauss lemma
+
+WHAT SHAPES THE LOSS LANDSCAPE OF SELF SUPERVISED LEARNING?
+https://openreview.net/pdf?id=3zSn48RUO8M
+
 ## 02.06.2023
 
 prepare everything on new pc
@@ -694,7 +704,7 @@ retrain convnext tiny dino
 
 convnext tiny train run died after 500 epochs, because of matplotlib memory error
 restart training with convnext atto to compare
-then try out vit pico configuration 
+then try out vit pico configuration
 
 -> linear finetune convnext tiny
 
@@ -721,4 +731,7 @@ kNN accuracy:            0.5229
 Precision:               0.5283266019296734
 Recall:                  0.5229
 F1:              0.51355132836184
+
+
+
 
