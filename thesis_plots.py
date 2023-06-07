@@ -1,7 +1,14 @@
+from functools import partial
+
 import plotly.graph_objects as go
 import torchvision
 import timm
 import torch
+from timm.models import register_model
+import torch.nn as nn
+
+from models.vision_transformer import VisionTransformer
+from utils import get_model_embed_dim
 
 SAILING_CLASS_DISTRIBUTION = {
     'ALGAE': 1, 'BIRD': 65, 'BOAT': 262, 'BOAT_WITHOUT_SAILS': 456, 'BUOY': 319, 'CONSTRUCTION': 207, 'CONTAINER': 51,
@@ -52,9 +59,18 @@ def print_model_params(model_name):
         model = timm.create_model(model_name, pretrained_cfg=None)
         params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1000000.0
         print(f'{params:.2f}M Params')
+        print(f'{get_model_embed_dim(model, model_name)}d embed dim')
+
+
+@register_model
+def vit_tiny(pretrained=False, patch_size=4, **kwargs):
+    model = VisionTransformer(
+        patch_size=patch_size, embed_dim=192, depth=9, num_heads=3, mlp_ratio=2,
+        qkv_bias=True, norm_layer=partial(nn.LayerNorm, eps=1e-6), **kwargs)
+    return model
 
 
 if __name__ == '__main__':
     # plot_class_distribution_sailing_dataset()
-    # print_model_params('mobilenetv2_150')
-    plot_example_from_dataset('cifar10')
+    print_model_params('mobilenetv2_050')
+    # plot_example_from_dataset('cifar10')
