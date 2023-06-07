@@ -166,8 +166,10 @@ def compute_knn(backbone, train_loader_plain, val_loader_plain):
 
     arrays = {k: np.concatenate(l) for k, l in lists.items()}
 
-    estimator = KNeighborsClassifier(algorithm='ball_tree', n_jobs=-1,
-                                     n_neighbors=5)  # TODO evaluate model with different neighbors, eg 20
+    estimator = KNeighborsClassifier(
+        algorithm='ball_tree', n_jobs=-1,
+        n_neighbors=20, weights='distance'
+    )  # TODO evaluate model with different neighbors, eg 20
     estimator.fit(arrays["X_train"], arrays["y_train"])
     y_val_pred = estimator.predict(arrays["X_val"])
 

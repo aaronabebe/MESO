@@ -712,4 +712,13 @@ try out knn with more neighbors, 20
 try out tsne with different learning rate, 250
 try out tsne with different perplexity, 20
 
+## 07.06.2023
+
+finished training convnext_atto cifar10 1000 epochs
+also following dino evaluation settings now with neighbors=20 and distance weight
+
+kNN accuracy:            0.5229
+Precision:               0.5283266019296734
+Recall:                  0.5229
+F1:              0.51355132836184
 

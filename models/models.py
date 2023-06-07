@@ -8,7 +8,7 @@ from torch import nn
 
 from models.convnext import ConvNeXt
 from models.vision_transformer import VisionTransformer
-from utils import remove_prefix, get_latest_model_path
+from utils import remove_prefix, get_latest_model_path, remove_head
 
 
 def get_model(name: str, **kwargs) -> torch.nn.Module:
@@ -62,7 +62,8 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
     print(f'Loading model from {path_override}')
     ckpt = torch.load(path_override, map_location=device)
 
-    model.load_state_dict(remove_prefix(ckpt['teacher'], 'backbone.'), strict=False)
+    model.load_state_dict(remove_prefix(ckpt['student'], 'backbone.'), strict=False)
+    remove_head(model)
     model.eval()
     return model
 
