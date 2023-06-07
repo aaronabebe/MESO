@@ -717,10 +717,14 @@ also continue writing thesis
 
 ## 06.06.2023
 
-writing on thesis methodology
+writing on thesis methodology, introduction, adding plots
 try out knn with more neighbors, 20
 try out tsne with different learning rate, 250
 try out tsne with different perplexity, 20
+
+## 07.06.2023
+
+continuing with thesis methodology, added section for loss landscapes, added diagram for introduction of method
 
 
 
