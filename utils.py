@@ -9,6 +9,8 @@ import torch.nn as nn
 import tqdm
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
+from fo_utils import SAILING_CLASSES_SUBSET_V1
+
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
 
@@ -214,6 +216,32 @@ class LARS(torch.optim.Optimizer):
                 mu.mul_(g['momentum']).add_(dp)
 
                 p.add_(mu, alpha=-g['lr'])
+
+
+def get_class_labels(dataset_name):
+    if dataset_name == 'cifar10':
+        return CIFAR10_LABELS
+    elif dataset_name == 'mnist':
+        return list(range(10))
+    elif dataset_name == 'fashion-mnist':
+        return FASHION_MNIST_LABELS
+    elif dataset_name == 'fiftyone':
+        return SAILING_CLASSES_SUBSET_V1
+    raise NotImplementedError(f'No such dataset: {dataset_name}')
+
+
+def get_mean_std(dataset):
+    if dataset == 'cifar10':
+        return CIFAR10_MEAN, CIFAR10_STD
+    elif dataset == 'mnist':
+        return MNIST_MEAN, MNIST_STD
+    elif dataset == 'fashion-mnist':
+        return FASHION_MNIST_MEAN, FASHION_MNIST_STD
+    elif dataset == 'fiftyone':
+        return SAILING_MEAN, SAILING_STD
+    elif dataset == 'fiftyone-16':
+        return SAILING_16_MEAN, SAILING_16_STD
+    raise NotImplementedError(f'No such dataset: {dataset}')
 
 
 def get_model_embed_dim(model, arch_name):
