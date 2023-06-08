@@ -1,13 +1,16 @@
 from functools import partial
+import matplotlib.pyplot as plt
 
 import plotly.graph_objects as go
 import torchvision
+from torchvision import transforms
 import timm
 import torch
 from timm.models import register_model
 import torch.nn as nn
 
 from models.vision_transformer import VisionTransformer
+from transforms import gauss_noise_tensor, random_gaussian_blur, flip_and_color_jitter, temperature_scale
 from utils import get_model_embed_dim
 
 SAILING_CLASS_DISTRIBUTION = {
@@ -36,7 +39,7 @@ def plot_class_distribution_sailing_dataset():
     fig.show()
 
 
-def plot_example_from_dataset(name):
+def get_example_from_dataset(name):
     if name == 'fashion_mnist':
         trainset = torchvision.datasets.FashionMNIST(
             root='./data',
@@ -51,7 +54,7 @@ def plot_example_from_dataset(name):
             download=True,
             transform=None
         )
-    trainset[345][0].show()
+    return trainset[345][0]
 
 
 def print_model_params(model_name):
@@ -60,6 +63,27 @@ def print_model_params(model_name):
         params = sum(p.numel() for p in model.parameters() if p.requires_grad) / 1000000.0
         print(f'{params:.2f}M Params')
         print(f'{get_model_embed_dim(model, model_name)}d embed dim')
+
+
+def plot_single_aug():
+    img = get_example_from_dataset('fashion_mnist')
+
+    # augmentation = random_gaussian_blur(1.0)
+    # augmentation = gauss_noise_tensor
+    # augmentation = flip_and_color_jitter()
+    augmentation = temperature_scale
+
+    t1 = transforms.Compose([
+        transforms.PILToTensor(),
+        augmentation,
+        transforms.ToPILImage()
+    ])
+    plt.figure(figsize=(16, 8))
+    plt.subplot(121)
+    plt.imshow(img, cmap='gray')
+    plt.subplot(122)
+    plt.imshow(t1(img), cmap='gray')
+    plt.show()
 
 
 @register_model
@@ -72,5 +96,6 @@ def vit_tiny(pretrained=False, patch_size=4, **kwargs):
 
 if __name__ == '__main__':
     # plot_class_distribution_sailing_dataset()
-    print_model_params('mobilenetv2_050')
-    # plot_example_from_dataset('cifar10')
+    # print_model_params('mobilenetv2_050')
+    # get_example_from_dataset('cifar10').show()
+    plot_single_aug()
