@@ -676,12 +676,11 @@ send consolidation )email to prof vincze
 
 test and prepare repo for handover
 
-
 ## 31.05.2023
 
 continue writing, lay down more detailed sections for methodology
 
-loss landscape facts: 
+loss landscape facts:
 
 random projections for dimensionality reduction work because of so called
 Johnson–Lindenstrauss lemma
@@ -714,15 +713,16 @@ train on massmind dataset and evaluate on sailing?
 tomorrow implement massmind data loading and cropping?
 also continue writing thesis
 
-
 ## 06.06.2023
 
-writing on thesis methodology
+writing on thesis methodology, introduction, adding plots
 try out knn with more neighbors, 20
 try out tsne with different learning rate, 250
 try out tsne with different perplexity, 20
 
 ## 07.06.2023
+
+continuing with thesis methodology, added section for loss landscapes, added diagram for introduction of method
 
 finished training convnext_atto cifar10 1000 epochs
 also following dino evaluation settings now with neighbors=20 and distance weight
@@ -735,16 +735,21 @@ F1:              0.51355132836184
 - [ ] TODO fix loss landscape for convnext models
 
 thesis
-- [ ] attention viz section
+
+- [x] attention viz section
 - [ ] feature correspondence section
 - [ ] data aug section
-- [ ] knowledge distillation section
+- [x] knowledge distillation section
 - [ ] parameter tuning and model selection section
 - [ ] methodology introduction problems and issues
+- [ ] sailing dataset section
 - [ ] 
 - [ ] 
 - [ ] 
 
+## 08.06.2023
 
+continue writing thesis
+data augmentation section, attention viz section, feature correspondence section
 
 

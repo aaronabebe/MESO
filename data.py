@@ -342,7 +342,7 @@ class SailingCropDataset(torch.utils.data.Dataset):
                 crop = np.asarray(crop, dtype=np.float32) / 2 ** 16
                 crop = Image.fromarray(crop)
 
-            crop = Image.merge('RGB', (crop, crop, crop))
+            # crop = Image.merge('RGB', (crop, crop, crop))
             crop = self.transforms(crop)
 
         return crop, label

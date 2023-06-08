@@ -63,7 +63,7 @@ def get_dataset(
         dataset_name: str = DATASET_NAME,
         dataset_dir_16bit: str = DATASET_DIR_16BIT, use_16bit: bool = False,
         ground_truth_label: str = GROUND_TRUTH_LABEL, min_crop_size: int = 1,
-        split=(0.9, 0.1)
+        split=(0.8, 0.2)
 ):
     # this needs to be set to load custom datatypes
     fo.config.module_path = "custom_embedded_files"
