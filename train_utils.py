@@ -10,9 +10,10 @@ from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.tensorboard import SummaryWriter
 
-from data import get_dataloader, default_resize_transforms, get_mean_std, DinoTransforms
+from data import get_dataloader
 from fo_utils import get_dataset
-from utils import LARS, get_experiment_name, TENSORBOARD_LOG_DIR
+from transforms import DinoTransforms, default_resize_transforms
+from utils import LARS, get_experiment_name, TENSORBOARD_LOG_DIR, get_mean_std
 from visualize import dino_attention, grad_cam, t_sne
 
 

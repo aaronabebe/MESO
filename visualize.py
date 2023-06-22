@@ -12,10 +12,12 @@ from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
 from sklearn.manifold import TSNE
 from torch.nn import functional as F
 
-from data import get_dataloader, default_resize_transforms, DinoTransforms, get_mean_std, get_class_labels
+from data import get_dataloader
 from fo_utils import get_dataset
 from models.models import get_eval_model
-from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings, fix_seeds
+from transforms import default_resize_transforms, DinoTransforms, get_mean_std
+from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings, fix_seeds, \
+    get_class_labels
 
 
 def grad_cam(model, model_name, data, plot=True, path=None):

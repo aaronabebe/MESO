@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 
 import plotly.graph_objects as go
 import torchvision
+from PIL import Image
 from torchvision import transforms
 import timm
 import torch
@@ -66,18 +67,20 @@ def print_model_params(model_name):
 
 
 def plot_single_aug():
-    img = get_example_from_dataset('fashion_mnist')
+    # img = get_example_from_dataset('fashion_mnist')
+    img = Image.open('/home/aaron/win_home/Downloads/sailing_example.png').convert("L")
 
     # augmentation = random_gaussian_blur(1.0)
     # augmentation = gauss_noise_tensor
-    # augmentation = flip_and_color_jitter()
-    augmentation = temperature_scale
+    augmentation = flip_and_color_jitter()
+    # augmentation = temperature_scale
 
     t1 = transforms.Compose([
         transforms.PILToTensor(),
         augmentation,
         transforms.ToPILImage()
     ])
+
     plt.figure(figsize=(16, 8))
     plt.subplot(121)
     plt.imshow(img, cmap='gray')
@@ -95,7 +98,8 @@ def vit_tiny(pretrained=False, patch_size=4, **kwargs):
 
 
 if __name__ == '__main__':
+    print(f'{len(SAILING_CLASS_DISTRIBUTION.keys())} classes in the sailing dataset.')
     # plot_class_distribution_sailing_dataset()
     # print_model_params('mobilenetv2_050')
     # get_example_from_dataset('cifar10').show()
-    plot_single_aug()
+    # plot_single_aug()

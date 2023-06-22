@@ -38,9 +38,11 @@ def gauss_noise_tensor(img):
     if not img.is_floating_point():
         img = img.to(torch.float32)
 
-    sigma = 0.8
+    sigma = 8.
 
+    print(img.shape)
     out = img + sigma * torch.randn_like(img)
+    print(out.shape)
 
     if out.dtype != dtype:
         out = out.to(dtype)
@@ -60,11 +62,11 @@ def flip_and_color_jitter():
 
 
 def random_gaussian_blur(p):
-    return transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=p)
+    return transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 3.0))], p=p)
 
 
 def temperature_scale(img):
-    scale_factor = 50
+    scale_factor = -10
     return img + scale_factor
 
 
