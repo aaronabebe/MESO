@@ -1,4 +1,5 @@
 import os
+import cv2
 import random
 import time
 
@@ -16,15 +17,16 @@ from data import get_dataloader
 from fo_utils import get_dataset
 from models.models import get_eval_model
 from transforms import default_resize_transforms, DinoTransforms, get_mean_std
-from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, CIFAR10_LABELS, compute_embeddings, fix_seeds, \
+from utils import grad_cam_reshape_transform, get_args, reshape_for_plot, compute_embeddings, fix_seeds_set_flags, \
     get_class_labels
 
 
-def grad_cam(model, model_name, data, plot=True, path=None):
+def grad_cam(args, model, data, plot=True, path=None):
     """
     Visualize model reasoning via grad_cam library
     """
     # use only one random image for now
+    model_name = args.model
     device = next(model.parameters()).device
 
     random_choice = random.randint(0, len(data[0]) - 1)
@@ -32,8 +34,9 @@ def grad_cam(model, model_name, data, plot=True, path=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
     classifier_target = None
+    class_names = get_class_labels(args.dataset)
     if len(data) > 1:
-        fig.suptitle(f'Input image class: {CIFAR10_LABELS[data[1][random_choice]]}')
+        fig.suptitle(f'Input image class: {class_names[data[1][random_choice]]}')
         classifier_target = [ClassifierOutputTarget(data[1][random_choice])]
 
     fig.tight_layout()
@@ -45,7 +48,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
     elif 'convnextv2' in model_name:
         target_layer = [model.stages[-1].blocks[-1]]
     elif 'mobilenet' in model_name:
-        target_layer = [model.blocks[-1][0].bn1]
+        target_layer = [model.blocks[-1][0]]
     else:
         target_layer = [model.layer4[-1]]
 
@@ -64,7 +67,7 @@ def grad_cam(model, model_name, data, plot=True, path=None):
     input_tensor = np.transpose(input_tensor.cpu().detach().numpy()[0], (1, 2, 0))
     ax1.imshow(input_tensor)
 
-    visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True)
+    visualization = show_cam_on_image(input_tensor, grayscale_cam[0, :], use_rgb=True, colormap=cv2.COLORMAP_VIRIDIS)
     ax2.imshow(visualization)
 
     if not path:
@@ -87,11 +90,13 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
     """
     Visualize model reasoning via t-SNE
     """
-    embs, _, labels = compute_embeddings(model, data_loader)
+
+    embs, labels = compute_embeddings(args, model, data_loader, is_training=path is not None)
 
     fig, ax = plt.subplots(figsize=(10, 10))
     tsne = TSNE(
         n_components=2,
+        early_exaggeration=12,
         random_state=123,
         verbose=1 if plot else 0,
         init='pca',
@@ -129,7 +134,7 @@ def t_sne(args, model, data_loader, plot=True, path=None, class_mean=False):
 
 
 @torch.no_grad()
-def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_size=2, avg_heads=True):
+def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_size=1, avg_heads=False):
     """
     Visualize the self attention of a transformer model, taken from official DINO paper.
     https://github.com/facebookresearch/dino
@@ -158,7 +163,7 @@ def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_
             # we keep only the output patch attention
             attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
             attentions = attentions.reshape(nh, w_featmap, h_featmap)
-            attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu()
+            attentions = F.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0]
 
             all_attentions.append(attentions)
 
@@ -168,7 +173,7 @@ def dino_attention(args, models, patch_size, data, plot=True, path=None, sample_
                 axs[0].imshow(avg_attn.detach().numpy())
                 axs[0].axis("off")
             else:
-                fig, axs = plt.subplots(1, nh + 1, figsize=(nh * 3, nh))
+                fig, axs = plt.subplots(1, nh + 1, figsize=(14, 10))
                 for j in range(nh):
                     ax = axs[j]
                     ax.imshow(attentions[j].detach().numpy())
@@ -202,7 +207,6 @@ def dino_simple_projection(args, model, patch_size, data, plot=True, path=None, 
     # use only one random image for now
     random_choice = random.randint(0, len(data[0]) - 1)
     img = data[0][random_choice]
-    print(img.shape)
 
     w, h = img.shape[1] - img.shape[1] % patch_size, img.shape[2] - img.shape[2] % patch_size
     img = img[:, :w, :h].unsqueeze(0)
@@ -316,20 +320,20 @@ def load_example_viz_image(image_path, input_channels, dataset, transforms):
     imgs = transforms(img)
 
     # add two 0 dims to match dataloader batch
-    data = torch.stack(imgs)
+    data = torch.stack(imgs) if isinstance(imgs, list) else imgs
     data = data.unsqueeze(0)
     data = data.unsqueeze(0)
     return data
 
 
 def is_timm_compatible(model_name):
-    return model_name in ['vit_', 'convnextv2']
+    return model_name in ['vit_pico', 'vit_tiny', 'convnextv2']
 
 
 def main(args):
-    print(f'Visualizing {args.visualize} for {args.model} model...')
+    print(f'=> Visualizing {args.visualize} for {args.model} model...')
 
-    fix_seeds(args.seed)
+    fix_seeds_set_flags(args.seed)
 
     # transforms
     if args.visualize in ['dino_attn', 'dino_proj', 'grad_cam']:
@@ -351,7 +355,10 @@ def main(args):
     if args.img_path is None:
         fo_dataset = None
         if args.dataset == 'fiftyone':
-            fo_dataset, _ = get_dataset(dataset_dir=args.fo_dataset_dir)
+            fo_dataset, _ = get_dataset(
+                dataset_dir=args.fo_dataset_dir,
+                min_crop_size=1
+            )
         dl = get_dataloader(
             args.dataset,
             transforms=transforms,
@@ -377,7 +384,7 @@ def main(args):
             img_size=args.input_size if is_timm_compatible(args.model) else None,
             load_remote=args.wandb,
             pretrained=args.timm,
-            _remove_head=args.ckpt_path
+            _remove_head=args.ckpt_path or args.timm
         )
 
     # viz
@@ -406,7 +413,7 @@ def main(args):
         dino_simple_projection(args, model, args.patch_size, data)
 
     elif args.visualize == 'grad_cam':
-        grad_cam(model, args.model, data)
+        grad_cam(args, model, data)
 
     elif args.visualize == 'tsne':
         if args.img_path is not None:

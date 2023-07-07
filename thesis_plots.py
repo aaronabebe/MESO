@@ -98,8 +98,9 @@ def vit_tiny(pretrained=False, patch_size=4, **kwargs):
 
 
 if __name__ == '__main__':
-    print(f'{len(SAILING_CLASS_DISTRIBUTION.keys())} classes in the sailing dataset.')
+    # print(f'{len(SAILING_CLASS_DISTRIBUTION.keys())} classes in the sailing dataset.')
     # plot_class_distribution_sailing_dataset()
-    # print_model_params('mobilenetv2_050')
+    print_model_params('mobilenetv2_100')
+    print_model_params('convnext_atto')
     # get_example_from_dataset('cifar10').show()
     # plot_single_aug()

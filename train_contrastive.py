@@ -10,13 +10,13 @@ from contrastive_utils import SupConLoss, ContrastiveHeadWrapper
 from dino_utils import dino_cosine_scheduler, MLPHead
 from models.models import get_model
 from train_utils import get_data_loaders, eval_model, get_optimizer, get_writer
-from utils import get_args, fix_seeds, get_model_embed_dim
+from utils import get_args, fix_seeds_set_flags, get_model_embed_dim
 
 
 def main(args):
     device = torch.device(args.device)
 
-    fix_seeds(args.seed)
+    fix_seeds_set_flags(args.seed)
     writer, output_dir = get_writer(args, sub_dir='contrastive')
 
     if args.wandb:

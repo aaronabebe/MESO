@@ -4,19 +4,25 @@ import sys
 
 import torch
 import tqdm
-import wandb
+from lightning import Fabric
 
+import wandb
 from dino_utils import MultiCropWrapper, MLPHead, DINOLoss, clip_gradients
 from dino_utils import get_params_groups, dino_cosine_scheduler, cancel_gradients_last_layer
 from models.models import get_model
 from train_utils import get_data_loaders, eval_model, get_optimizer, get_writer
-from utils import get_args, fix_seeds, get_model_embed_dim
+from utils import get_args, fix_seeds_set_flags, get_model_embed_dim
 
 
 def main(args):
     device = torch.device(args.device)
+    fabric = Fabric(
+        accelerator=args.device,
+        precision="bf16-mixed"
+    )
+    fabric.launch()
 
-    fix_seeds(args.seed)
+    fix_seeds_set_flags(args.seed)
     writer, output_dir = get_writer(args, sub_dir='dino')
 
     if args.wandb:
@@ -90,6 +96,8 @@ def main(args):
 
     # momentum parameter is increased to 1. during training with a cosine schedule
     momentum_schedule = dino_cosine_scheduler(args.momentum_teacher, 1, args.epochs, len(train_loader))
+    fabric.setup(student, optim)
+    train_loader, train_loader_plain, val_loader_plain = fabric.setup_dataloaders(train_loader, train_loader_plain, val_loader_plain)
     print("=> Loss, optimizer and schedulers ready.")
 
     n_batches = len(train_loader.dataset) // args.batch_size
@@ -151,8 +159,6 @@ def main(args):
                 if i == 0:  # only the first group is regularized
                     param_group["weight_decay"] = wd_schedule[it]
 
-            images = [img.to(device) for img in images]
-
             teacher_outputs = teacher(images[:2])
             student_outputs = student(images)
 
@@ -163,7 +169,7 @@ def main(args):
                 sys.exit(1)
 
             optim.zero_grad()
-            loss.backward()
+            fabric.backward(loss)
             cancel_gradients_last_layer(epoch, student, args.freeze_last_layer)
             clip_gradients(student, args.clip_grad)
             optim.step()

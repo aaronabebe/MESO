@@ -13,6 +13,7 @@ from fo_utils import SAILING_CLASSES_SUBSET_V1
 
 TENSORBOARD_LOG_DIR = './tb_logs'
 DEFAULT_DATA_DIR = './data'
+KNN_CACHE_DIR = 'knn_cache'
 
 # from https://stackoverflow.com/questions/66678052/how-to-calculate-the-mean-and-the-std-of-cifar10-data
 CIFAR10_MEAN = (0.49139968, 0.48215841, 0.44653091)
@@ -134,14 +135,16 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def fix_seeds(seed):
+def fix_seeds_set_flags(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = True
     np.random.seed(seed)
     random.seed(seed)
+
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
+    torch.set_float32_matmul_precision("medium")
 
 
 def get_experiment_name(args):
@@ -266,25 +269,36 @@ def reshape_for_plot(img, mean=0.5, std=0.5):
     return img.permute(1, 2, 0) * std + mean
 
 
-def compute_embeddings(backbone, data_loader, mean=0.5, std=0.5):
+def get_knn_cache_path(args):
+    os.makedirs(KNN_CACHE_DIR, exist_ok=True)
+    return f"{KNN_CACHE_DIR}/{args.model}_{args.dataset}_{args.train_subset}_{args.test_subset}{'_pretrained' if args.timm else ''}.npz"
+
+
+def compute_embeddings(args, backbone, data_loader, is_training=False):
     device = next(backbone.parameters()).device
 
-    embs_l = []
-    imgs_l = []
-    labels = []
+    if is_training:
+        embs_l = []
+        labels = []
 
-    for img, y in tqdm.tqdm(data_loader, leave=False, desc='Computing embs'):
-        img = img.to(device)
-        embs_l.append(backbone(img).detach().cpu())
-        imgs_l.append(((img * std) + mean).cpu())  # undo norm
-        # labels.extend([CIFAR10_LABELS[i] for i in y.tolist()])
-        labels.extend(y.tolist())
+        for img, y in tqdm.tqdm(data_loader, leave=False, desc='Computing embs'):
+            img = img.to(device)
+            embs_l.append(backbone(img).detach().cpu())
+            labels.extend(y.tolist())
 
-    embs = torch.cat(embs_l, dim=0)
-    imgs = torch.cat(imgs_l, dim=0)
-    labels = np.array(labels)
+        embs = torch.cat(embs_l, dim=0)
+        labels = np.array(labels)
+    else:
+        print('=> Loading cached embeddings...')
+        cached_path = get_knn_cache_path(args)
+        if os.path.exists(cached_path):
+            cached = np.load(cached_path)
+            embs = torch.from_numpy(cached['embs'])
+            labels = cached['labels']
+        else:
+            raise ValueError(f'No cached embeddings for {args.dataset} and {args.model}. Please run precompute_knn.py')
 
-    return embs, imgs, labels
+    return embs, labels
 
 
 def remove_head(backbone):

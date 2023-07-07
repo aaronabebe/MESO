@@ -1,13 +1,13 @@
 from models.models import get_eval_model
 from train_utils import get_data_loaders, compute_knn
-from utils import get_args, fix_seeds
+from utils import get_args, fix_seeds_set_flags
 from visualize import is_timm_compatible
 
 
 def main(args):
     print(f'Running kNN eval for {args.model} model...')
 
-    fix_seeds(args.seed)
+    fix_seeds_set_flags(args.seed)
 
     model = get_eval_model(
         args.model,

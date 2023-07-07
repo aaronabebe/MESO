@@ -3,13 +3,14 @@ import argparse
 import torch
 import torch.nn as nn
 import tqdm
+from lightning import Fabric
 
 import wandb
 from data import get_dataloader
 from fo_utils import get_dataset
 from models.models import get_eval_model
 from train_utils import get_writer
-from utils import get_args, get_model_embed_dim, fix_seeds, eval_accuracy
+from utils import get_args, get_model_embed_dim, fix_seeds_set_flags, eval_accuracy
 
 N_LAST_BLOCKS_VIT_SMALL = 4
 N_LAST_BLOCKS_VIT_BASE = 1
@@ -17,8 +18,13 @@ N_LAST_BLOCKS_VIT_BASE = 1
 
 def main(args: argparse.Namespace):
     device = torch.device(args.device)
+    fabric = Fabric(
+        accelerator=args.device,
+        precision="bf16-mixed"
+    )
+    fabric.launch()
 
-    fix_seeds(args.seed)
+    fix_seeds_set_flags(args.seed)
     writer, output_dir = get_writer(args, sub_dir='linear')
 
     if args.wandb:
@@ -100,10 +106,13 @@ def main(args: argparse.Namespace):
     start_epoch = 0
 
     # TODO add resume from checkpoint
+    fabric.setup(model, optimizer)
+    train_loader, val_loader = fabric.setup_dataloaders(train_loader, val_loader)
+
 
     n_steps = start_epoch * args.batch_size
     for epoch in tqdm.auto.trange(start_epoch, args.epochs, desc=" epochs", position=0):
-        if args.eval:
+        if args.eval and epoch % args.eval_freq == 0:
             linear_classifier.eval()
             with torch.no_grad():
                 accs, precisions, recalls, f1s = [], [], [], []
@@ -111,13 +120,13 @@ def main(args: argparse.Namespace):
                 progress_bar = tqdm.auto.tqdm(enumerate(val_loader), desc=" val batches", position=1, leave=False,
                                               total=len(val_loader.dataset) // args.batch_size)
                 for it, (images, labels) in progress_bar:
-                    images, labels = images.to(device), labels.to(device)
                     with torch.no_grad():
                         if "vit_" in args.model:
                             intermediate_output = model.get_intermediate_layers(images, n_last_blocks)
                             output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                         else:
                             output = model(images)
+
                     output = linear_classifier(output)
                     loss = nn.CrossEntropyLoss()(output, labels)
                     losses.append(loss.item())
@@ -172,18 +181,18 @@ def main(args: argparse.Namespace):
 
         progress_bar = tqdm.auto.tqdm(enumerate(train_loader), position=1, leave=False, total=n_batches)
         for it, (images, labels) in progress_bar:
-            images, labels = images.to(device), labels.to(device)
             with torch.no_grad():
                 if "vit_" in args.model:
                     intermediate_output = model.get_intermediate_layers(images, n_last_blocks)
                     output = torch.cat([x[:, 0] for x in intermediate_output], dim=-1)
                 else:
                     output = model(images)
+
             output = linear_classifier(output)
             loss = nn.CrossEntropyLoss()(output, labels)
 
             optimizer.zero_grad()
-            loss.backward()
+            fabric.backward(loss)
             optimizer.step()
 
             # count acc

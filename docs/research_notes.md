@@ -753,3 +753,128 @@ continue writing thesis
 data augmentation section, attention viz section, feature correspondence section
 
 
+## 27.06.2023
+
+almost finished training all final models for thesis 
+
+### tsne settings
+
+cifar
+- perplexity 100
+ 
+fashion mnist
+- perplexity 20
+ 
+sailing
+- perplexity 30
+
+## 03.07.2023
+
+#### Final pretraining results
+
+convnext_cifar
+-----------------------
+kNN accuracy:            0.5229
+Precision:               0.5283266019296734
+Recall:                  0.5229
+F1:              0.51355132836184
+
+vit_cifar
+-----------------------
+kNN accuracy:            0.4173
+Precision:               0.4177100614228746
+Recall:                  0.4173
+F1:              0.40800846571974686
+
+mobile_cifar
+-----------------------
+kNN accuracy:            0.3392
+Precision:               0.3396223015727267
+Recall:                  0.3392
+F1:              0.3337076078134416
+
+
+mobilenet_sailing
+-----------------------
+kNN accuracy:            0.8683492496589359
+Precision:               0.8740678036320041
+Recall:                  0.8683492496589359
+F1:              0.8683854611778464
+
+convnext_sailing
+-----------------------
+kNN accuracy:            0.8478854024556617
+Precision:               0.8585128989131237
+Recall:                  0.8478854024556617
+F1:              0.8488406942273872
+
+vit_sailing
+-----------------------
+kNN accuracy:            0.8567530695770805
+Precision:               0.8609002117664758
+Recall:                  0.8567530695770805
+F1:              0.8564389574468948
+
+
+mobile_fashion
+-----------------------
+kNN accuracy:            0.7232
+Precision:               0.726787743400978
+Recall:                  0.7232
+F1:              0.7235034245544115
+
+vit_fashion
+-----------------------
+kNN accuracy:            0.7708
+Precision:               0.7735878420656198
+Recall:                  0.7708
+F1:              0.7709937988105345
+
+convnext_fashion
+-----------------------
+kNN accuracy:            0.8535
+Precision:               0.8535732649208001
+Recall:                  0.8535
+F1:              0.8529281911531532
+
+
+### 05.07.2023
+
+all ablation studies are done on sailing dataset
+convnext atto
+only SSL pretraining
+
+#### crop scale plot
+
+local crop scale
+
+blooming galaxy 81: [0.2,0.5]
+doting tulip 122: [0.3,0.4]
+
+local_crop_input_factor
+radiant gorge 135: 1
+find fitting experiment :2
+
+#### effects of regularization methods
+
+
+
+#### effects of optimizer on convnext
+
+bright rooster 119 adamw
+doting tulip 122 LARS
+
+#### effects of augmentation: color jitter with | without
+
+#### effects of augmentation: noise with | without
+
+#### effects of augmentation: temp scaling with | without
+
+
+#### effects of hyperparam: LR
+
+#### effects of hyperparam: input size
+
+#### effects of hyperparam: batch size
+
+

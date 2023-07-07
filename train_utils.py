@@ -132,7 +132,7 @@ def eval_model(args, example_viz_img, n_steps, output_dir, model, train_loader_p
                                               plot=False,
                                               path=output_dir)
         else:
-            orig, attentions = grad_cam(model, args.model, (example_viz_img,), plot=False, path=output_dir)
+            orig, attentions = grad_cam(args, model, (example_viz_img,), plot=False, path=output_dir)
 
         tsne_fig = t_sne(args, model, val_loader_plain, plot=False, path=output_dir)
         if args.wandb:

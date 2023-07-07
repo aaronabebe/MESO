@@ -65,6 +65,7 @@ def get_eval_model(name: str, device: torch.device, dataset: str, path_override=
     model.load_state_dict(remove_prefix(ckpt['student'], 'backbone.'), strict=False)
     model.eval()
     if _remove_head:
+        print('=> Removing head from model')
         remove_head(model)
     return model
 
